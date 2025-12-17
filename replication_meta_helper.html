@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Replication Coding Helper</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=JetBrains+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #faf9f7;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f5f3f0;
+            --text-primary: #1a1a1a;
+            --text-secondary: #555555;
+            --text-muted: #888888;
+            --accent: #8b5cf6;
+            --accent-hover: #7c3aed;
+            --accent-light: #ede9fe;
+            --border: #e5e2dc;
+            --border-focus: #a78bfa;
+            --success: #10b981;
+            --success-bg: #d1fae5;
+            --original-color: #0ea5e9;
+            --original-bg: #e0f2fe;
+            --replication-color: #f59e0b;
+            --replication-bg: #fef3c7;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+            --radius: 8px;
+            --radius-lg: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Source Sans 3', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .input-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .input-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .input-group {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+        }
+
+        .input-group.original {
+            border-top: 3px solid var(--original-color);
+        }
+
+        .input-group.replication {
+            border-top: 3px solid var(--replication-color);
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            font-size: 0.95rem;
+        }
+
+        .input-group.original label {
+            color: var(--original-color);
+        }
+
+        .input-group.replication label {
+            color: var(--replication-color);
+        }
+
+        .input-row {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .enter-hint {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-left: 0.25rem;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 0.875rem 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--bg-tertiary);
+            transition: all 0.2s ease;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            background: var(--bg-secondary);
+            box-shadow: 0 0 0 3px var(--accent-light);
+        }
+
+        input[type="text"]::placeholder {
+            color: var(--text-muted);
+        }
+
+        button {
+            padding: 0.875rem 1.5rem;
+            font-family: 'Source Sans 3', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 500;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-fetch {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-fetch:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-fetch:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .result-column {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .result-column.original .result-card {
+            border-left: 3px solid var(--original-color);
+        }
+
+        .result-column.replication .result-card {
+            border-left: 3px solid var(--replication-color);
+        }
+
+        .column-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            font-weight: 600;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .column-header.original {
+            background: var(--original-bg);
+            color: var(--original-color);
+        }
+
+        .column-header.replication {
+            background: var(--replication-bg);
+            color: var(--replication-color);
+        }
+
+        .result-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.25rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .card-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            background: var(--accent-light);
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .card-content {
+            padding: 1.25rem;
+        }
+
+        .copyable {
+            position: relative;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .copyable:hover {
+            background: var(--accent-light);
+            border-color: var(--accent);
+        }
+
+        .copyable:active {
+            transform: scale(0.99);
+        }
+
+        .copyable.copied {
+            background: var(--success-bg);
+            border-color: var(--success);
+        }
+
+        .copyable.copied::after {
+            content: 'Copied!';
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--success);
+            padding: 0.25rem 0.5rem;
+            background: white;
+            border-radius: 4px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .copyable-hint {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .copyable:hover .copyable-hint {
+            opacity: 1;
+        }
+
+        .copyable.copied .copyable-hint {
+            display: none;
+        }
+
+        .bibtex-content, .apa-content {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: var(--text-primary);
+        }
+
+        .abstract-content {
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-size: 1rem;
+            line-height: 1.8;
+            color: var(--text-primary);
+        }
+
+        .keywords-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .keyword-tag {
+            display: inline-block;
+            padding: 0.5rem 0.875rem;
+            background: var(--bg-tertiary);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .keyword-tag:hover {
+            background: var(--accent-light);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .keyword-tag.copied {
+            background: var(--success-bg);
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .source-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .source-tab {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .source-tab:hover {
+            background: var(--accent-light);
+        }
+
+        .source-tab.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .no-data {
+            color: var(--text-muted);
+            font-style: italic;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .error-message {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 1rem;
+            border-radius: var(--radius);
+            margin-bottom: 1rem;
+        }
+
+        .metadata-row {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .metadata-item {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .metadata-item strong {
+            color: var(--text-secondary);
+        }
+
+        footer {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Replication Coding Helper</h1>
+            <p class="subtitle">Fetch references, abstracts, and keywords from CrossRef & OpenAlex</p>
+        </header>
+
+        <div class="input-section">
+            <div class="input-group original">
+                <label for="original-doi">Original Study DOI</label>
+                <div class="input-row">
+                    <input type="text" id="original-doi" placeholder="10.1000/example.123">
+                    <button class="btn-fetch" onclick="fetchSingle('original')">Fetch</button>
+                    <span class="enter-hint">or press Enter</span>
+                </div>
+            </div>
+            <div class="input-group replication">
+                <label for="replication-doi">Replication Study DOI</label>
+                <div class="input-row">
+                    <input type="text" id="replication-doi" placeholder="10.1000/example.456">
+                    <button class="btn-fetch" onclick="fetchSingle('replication')">Fetch</button>
+                    <span class="enter-hint">or press Enter</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <span>Fetching metadata...</span>
+        </div>
+
+        <div id="error-container"></div>
+
+        <div id="results" class="results-grid" style="display: none;">
+            <div class="result-column original">
+                <div class="column-header original">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    Original Study
+                </div>
+                <div id="original-results"></div>
+            </div>
+            <div class="result-column replication">
+                <div class="column-header replication">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Replication Study
+                </div>
+                <div id="replication-results"></div>
+            </div>
+        </div>
+
+        <footer>
+            Data fetched from <a href="https://www.crossref.org/" target="_blank">CrossRef</a> and <a href="https://openalex.org/" target="_blank">OpenAlex</a>. 
+            Click any item to copy to clipboard.
+        </footer>
+    </div>
+
+    <script>
+        // Store fetched data
+        const data = {
+            original: null,
+            replication: null
+        };
+
+        // Clean DOI input
+        function cleanDOI(doi) {
+            if (!doi) return '';
+            doi = doi.trim();
+            // Remove common prefixes
+            doi = doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '');
+            doi = doi.replace(/^doi:\s*/i, '');
+            return doi;
+        }
+
+        // Fetch from CrossRef
+        async function fetchCrossRef(doi) {
+            const response = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`);
+            if (!response.ok) throw new Error(`CrossRef: ${response.status}`);
+            const data = await response.json();
+            return data.message;
+        }
+
+        // Fetch from OpenAlex
+        async function fetchOpenAlex(doi) {
+            const response = await fetch(`https://api.openalex.org/works/doi:${encodeURIComponent(doi)}`);
+            if (!response.ok) throw new Error(`OpenAlex: ${response.status}`);
+            return await response.json();
+        }
+
+        // Reconstruct abstract from inverted index
+        function reconstructAbstract(invertedIndex) {
+            if (!invertedIndex) return null;
+            const words = [];
+            for (const [word, positions] of Object.entries(invertedIndex)) {
+                for (const pos of positions) {
+                    words[pos] = word;
+                }
+            }
+            return words.join(' ');
+        }
+
+        // Generate BibTeX from CrossRef data
+        function generateBibTeX(crossref) {
+            if (!crossref) return null;
+            
+            const type = crossref.type === 'journal-article' ? 'article' : 
+                         crossref.type === 'book-chapter' ? 'incollection' : 
+                         crossref.type === 'book' ? 'book' : 'misc';
+            
+            const firstAuthor = crossref.author?.[0];
+            const year = crossref.published?.['date-parts']?.[0]?.[0] || 
+                        crossref['published-print']?.['date-parts']?.[0]?.[0] ||
+                        crossref['published-online']?.['date-parts']?.[0]?.[0] || 'n.d.';
+            
+            const key = firstAuthor ? 
+                `${firstAuthor.family?.toLowerCase() || 'unknown'}${year}` : 
+                `ref${year}`;
+            
+            let bibtex = `@${type}{${key},\n`;
+            
+            // Authors
+            if (crossref.author?.length) {
+                const authors = crossref.author.map(a => {
+                    if (a.family && a.given) return `${a.family}, ${a.given}`;
+                    if (a.name) return a.name;
+                    return a.family || 'Unknown';
+                }).join(' and ');
+                bibtex += `  author = {${authors}},\n`;
+            }
+            
+            // Title
+            if (crossref.title?.[0]) {
+                bibtex += `  title = {${crossref.title[0]}},\n`;
+            }
+            
+            // Journal/Container
+            if (crossref['container-title']?.[0]) {
+                const field = type === 'article' ? 'journal' : 
+                             type === 'incollection' ? 'booktitle' : 'publisher';
+                bibtex += `  ${field} = {${crossref['container-title'][0]}},\n`;
+            }
+            
+            // Year
+            bibtex += `  year = {${year}},\n`;
+            
+            // Volume
+            if (crossref.volume) {
+                bibtex += `  volume = {${crossref.volume}},\n`;
+            }
+            
+            // Issue/Number
+            if (crossref.issue) {
+                bibtex += `  number = {${crossref.issue}},\n`;
+            }
+            
+            // Pages
+            if (crossref.page) {
+                bibtex += `  pages = {${crossref.page}},\n`;
+            }
+            
+            // DOI
+            if (crossref.DOI) {
+                bibtex += `  doi = {${crossref.DOI}},\n`;
+            }
+            
+            bibtex += `}`;
+            return bibtex;
+        }
+
+        // Generate APA reference from CrossRef data
+        function generateAPA(crossref) {
+            if (!crossref) return null;
+            
+            let apa = '';
+            
+            // Authors
+            if (crossref.author?.length) {
+                const authors = crossref.author.map((a, i, arr) => {
+                    const name = a.family && a.given ? 
+                        `${a.family}, ${a.given.split(' ').map(n => n[0] + '.').join(' ')}` :
+                        a.name || a.family || 'Unknown';
+                    
+                    if (arr.length === 1) return name;
+                    if (i === arr.length - 1) return `& ${name}`;
+                    if (arr.length === 2) return `${name} `;
+                    return `${name}, `;
+                });
+                apa += authors.join('');
+            }
+            
+            // Year
+            const year = crossref.published?.['date-parts']?.[0]?.[0] || 
+                        crossref['published-print']?.['date-parts']?.[0]?.[0] ||
+                        crossref['published-online']?.['date-parts']?.[0]?.[0] || 'n.d.';
+            apa += ` (${year}). `;
+            
+            // Title
+            if (crossref.title?.[0]) {
+                apa += `${crossref.title[0]}. `;
+            }
+            
+            // Journal (italicized in markdown notation for display)
+            if (crossref['container-title']?.[0]) {
+                apa += `${crossref['container-title'][0]}`;
+                
+                // Volume and issue
+                if (crossref.volume) {
+                    apa += `, ${crossref.volume}`;
+                    if (crossref.issue) {
+                        apa += `(${crossref.issue})`;
+                    }
+                }
+                
+                // Pages
+                if (crossref.page) {
+                    apa += `, ${crossref.page}`;
+                }
+                
+                apa += '. ';
+            }
+            
+            // DOI
+            if (crossref.DOI) {
+                apa += `https://doi.org/${crossref.DOI}`;
+            }
+            
+            return apa;
+        }
+
+        // Copy to clipboard
+        async function copyToClipboard(text, element) {
+            try {
+                await navigator.clipboard.writeText(text);
+                element.classList.add('copied');
+                setTimeout(() => element.classList.remove('copied'), 1500);
+            } catch (err) {
+                console.error('Failed to copy:', err);
+            }
+        }
+
+        // Create copyable element
+        function createCopyable(content, className = '', isTag = false) {
+            if (!content) return '<div class="no-data">Not available</div>';
+            
+            if (isTag) {
+                return `<span class="keyword-tag" onclick="copyToClipboard('${content.replace(/'/g, "\\'")}', this)">${content}</span>`;
+            }
+            
+            return `
+                <div class="copyable" onclick="copyToClipboard(this.querySelector('.${className}-text').textContent, this)">
+                    <span class="copyable-hint">Click to copy</span>
+                    <div class="${className}-text ${className}-content">${content}</div>
+                </div>
+            `;
+        }
+
+        // Render results for a study
+        function renderResults(type) {
+            const studyData = data[type];
+            if (!studyData) return;
+            
+            const container = document.getElementById(`${type}-results`);
+            const { crossref, openalex } = studyData;
+            
+            // BibTeX
+            const bibtexCrossref = generateBibTeX(crossref);
+            
+            // APA
+            const apaCrossref = generateAPA(crossref);
+            
+            // Abstract
+            const abstractCrossref = crossref?.abstract?.replace(/<\/?jats:[^>]+>/g, '');
+            const abstractOpenAlex = openalex?.abstract_inverted_index ? 
+                reconstructAbstract(openalex.abstract_inverted_index) : null;
+            
+            // Keywords
+            const keywordsCrossref = crossref?.subject || [];
+            const keywordsOpenAlex = openalex?.keywords?.map(k => k.display_name) || [];
+            const conceptsOpenAlex = openalex?.concepts?.slice(0, 10).map(c => c.display_name) || [];
+
+            // Combined unique keywords list (semicolon-separated for one-click copy)
+            const combinedKeywords = Array.from(new Set([
+                ...keywordsCrossref,
+                ...keywordsOpenAlex,
+                ...conceptsOpenAlex
+            ].filter(Boolean)));
+            const combinedKeywordsString = combinedKeywords.length ? combinedKeywords.join('; ') : null;
+            
+            container.innerHTML = `
+                <!-- BibTeX Card -->
+                <div class="result-card">
+                    <div class="card-header">
+                        <span class="card-title">BibTeX</span>
+                        <span class="card-badge">CrossRef</span>
+                    </div>
+                    <div class="card-content">
+                        ${bibtexCrossref ? createCopyable(bibtexCrossref, 'bibtex') : '<div class="no-data">Not available</div>'}
+                    </div>
+                </div>
+                
+                <!-- APA Card -->
+                <div class="result-card">
+                    <div class="card-header">
+                        <span class="card-title">APA Reference</span>
+                        <span class="card-badge">CrossRef</span>
+                    </div>
+                    <div class="card-content">
+                        ${apaCrossref ? createCopyable(apaCrossref, 'apa') : '<div class="no-data">Not available</div>'}
+                    </div>
+                </div>
+                
+                <!-- Abstract Card -->
+                <div class="result-card">
+                    <div class="card-header">
+                        <span class="card-title">Abstract</span>
+                        <span class="card-badge">${abstractCrossref ? 'CrossRef' : abstractOpenAlex ? 'OpenAlex' : 'N/A'}</span>
+                    </div>
+                    <div class="card-content">
+                        ${(abstractCrossref || abstractOpenAlex) ? 
+                            createCopyable(abstractCrossref || abstractOpenAlex, 'abstract') : 
+                            '<div class="no-data">Abstract not available</div>'}
+                    </div>
+                </div>
+                
+                <!-- Keywords Card -->
+                <div class="result-card">
+                    <div class="card-header">
+                        <span class="card-title">Keywords & Concepts</span>
+                    </div>
+                    <div class="card-content">
+                        ${combinedKeywordsString ? `
+                            <div style="margin-bottom: 0.75rem;">
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">All Keywords (semicolon-separated)</div>
+                                <div>
+                                    ${createCopyable(combinedKeywordsString, 'keywords-list')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${!combinedKeywordsString && keywordsCrossref.length > 0 ? `
+                            <div style="margin-bottom: 0.75rem;">
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">CrossRef Subjects</div>
+                                <div class="keywords-container">
+                                    ${keywordsCrossref.map(k => createCopyable(k, '', true)).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${!combinedKeywordsString && keywordsOpenAlex.length > 0 ? `
+                            <div style="margin-bottom: 0.75rem;">
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">OpenAlex Keywords</div>
+                                <div class="keywords-container">
+                                    ${keywordsOpenAlex.map(k => createCopyable(k, '', true)).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${!combinedKeywordsString && conceptsOpenAlex.length > 0 ? `
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">OpenAlex Concepts</div>
+                                <div class="keywords-container">
+                                    ${conceptsOpenAlex.map(k => createCopyable(k, '', true)).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${!combinedKeywordsString && keywordsCrossref.length === 0 && keywordsOpenAlex.length === 0 && conceptsOpenAlex.length === 0 ? 
+                            '<div class="no-data">No keywords available</div>' : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Fetch data for a single study
+        async function fetchSingle(type) {
+            const inputId = type === 'original' ? 'original-doi' : 'replication-doi';
+            const doi = cleanDOI(document.getElementById(inputId).value);
+            
+            if (!doi) {
+                showError(`Please enter a DOI for the ${type} study.`);
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'flex';
+            document.getElementById('error-container').innerHTML = '';
+            
+            try {
+                const [crossref, openalex] = await Promise.allSettled([
+                    fetchCrossRef(doi),
+                    fetchOpenAlex(doi)
+                ]);
+                
+                data[type] = {
+                    crossref: crossref.status === 'fulfilled' ? crossref.value : null,
+                    openalex: openalex.status === 'fulfilled' ? openalex.value : null
+                };
+                
+                if (!data[type].crossref && !data[type].openalex) {
+                    throw new Error(`Could not fetch data for DOI: ${doi}`);
+                }
+                
+                document.getElementById('results').style.display = 'grid';
+                renderResults(type);
+                
+            } catch (error) {
+                showError(`Error fetching ${type} study: ${error.message}`);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            document.getElementById('error-container').innerHTML = `
+                <div class="error-message">${message}</div>
+            `;
+        }
+
+        // Handle Enter key in input fields
+        // Support Enter key to trigger fetch (use keydown for broader compatibility)
+        document.getElementById('original-doi').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') fetchSingle('original');
+        });
+
+        document.getElementById('replication-doi').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') fetchSingle('replication');
+        });
+    </script>
+</body>
+</html>
