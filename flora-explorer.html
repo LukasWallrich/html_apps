@@ -287,7 +287,7 @@
                             <th>Outcome</th>
                             <th>Type</th>
                             <th>Original DOI</th>
-                            <th>Replication DOI</th>
+                            <th>Replication Report</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -380,24 +380,24 @@
             }
         }
 
-        function formatDoiOrUrl(doi, url) {
-            if (doi) {
-                return formatDOI(doi, true);
-            }
+        function formatUrlOrDoi(url, doi) {
             if (url) {
                 const displayUrl = url.length > 40 ? url.substring(0, 40) + '...' : url;
                 return `<a href="${escapeHtml(url)}" target="_blank" class="doi-link">${escapeHtml(displayUrl)}</a>`;
             }
+            if (doi) {
+                return formatDOI(doi, true);
+            }
             return '-';
         }
 
-        function formatDoiOrUrlShort(doi, url) {
-            if (doi) {
-                return formatDOI(doi, false);
-            }
+        function formatUrlOrDoiShort(url, doi) {
             if (url) {
                 const displayUrl = url.length > 25 ? url.substring(0, 25) + '...' : url;
                 return `<a href="${escapeHtml(url)}" target="_blank" class="doi-link" title="${escapeHtml(url)}">${escapeHtml(displayUrl)}</a>`;
+            }
+            if (doi) {
+                return formatDOI(doi, false);
             }
             return '-';
         }
@@ -422,7 +422,7 @@
                                 <div><span class="detail-label">Title:</span> <span class="detail-value">${escapeHtml(rowData.title_r) || '-'}</span></div>
                                 <div><span class="detail-label">Authors:</span> <span class="detail-value">${formatAuthors(rowData.author_r)}</span></div>
                                 <div><span class="detail-label">Year:</span> <span class="detail-value">${escapeHtml(rowData.year_r) || '-'}</span></div>
-                                <div><span class="detail-label">DOI/URL:</span> <span class="detail-value">${formatDoiOrUrl(rowData.doi_r, rowData.url_r)}</span></div>
+                                <div><span class="detail-label">Report:</span> <span class="detail-value">${formatUrlOrDoi(rowData.url_r, rowData.doi_r)}</span></div>
                                 ${rowData.journal_r ? `<div><span class="detail-label">Journal:</span> <span class="detail-value">${escapeHtml(rowData.journal_r)}</span></div>` : ''}
                             </div>
                         </div>
@@ -513,8 +513,8 @@
                             search: row.doi_o || ''
                         },
                         {
-                            display: formatDoiOrUrlShort(row.doi_r, row.url_r),
-                            search: `${row.doi_r || ''} ${row.url_r || ''}`
+                            display: formatUrlOrDoiShort(row.url_r, row.doi_r),
+                            search: `${row.url_r || ''} ${row.doi_r || ''}`
                         }
                     ]);
 
