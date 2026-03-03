@@ -487,7 +487,13 @@
                         console.warn('CSV parsing warnings:', results.errors);
                     }
 
-                    const data = results.data;
+                    // Normalize R's "NA" strings to empty (R writes NA as the string "NA" in CSV)
+                    const data = results.data.map(row => {
+                        Object.keys(row).forEach(key => {
+                            if (row[key] === 'NA') row[key] = '';
+                        });
+                        return row;
+                    });
                     fullRowData = data; // Store for detail view
                     updateStats(data);
 
