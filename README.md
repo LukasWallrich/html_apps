@@ -23,6 +23,12 @@ A collection of vibe-coded HTML apps for personal use.
 - **Description**: Interactive explorer for the FORRT Library of Replication Attempts (FLoRA) database. Features searchable table with expandable row details showing full references, replication outcomes, and study metadata. Data sourced from the [FORRT FReD Project](https://github.com/forrtproject/FReD-data).
 
 
+### 📄 PDF Merger
+- **Link**: [pdf_merge.html](./pdf_merge.html)
+- **Description**: Merge multiple PDFs in-browser with visual page thumbnails. Drag-and-drop to reorder individual pages or entire files, remove unwanted pages, then download the merged result. All processing happens locally — no uploads.
+
+---
+
 ## Deployment
 
 These apps are deployed via GitHub Pages. Visit the live site at: https://lukaswallrich.github.io/html_apps/

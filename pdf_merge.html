@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folio — PDF Merger</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --ink: #1a1a1a;
+            --paper: #faf8f5;
+            --cream: #f5f2ed;
+            --warm-gray: #8a8279;
+            --accent: #c4a77d;
+            --accent-deep: #a08660;
+            --shadow: rgba(26, 26, 26, 0.08);
+            --shadow-deep: rgba(26, 26, 26, 0.15);
+            --danger: #c45d4d;
+            --danger-hover: #a84a3c;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--paper);
+            color: var(--ink);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        header {
+            padding: 1.5rem 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--shadow);
+            background: linear-gradient(180deg, var(--paper) 0%, var(--cream) 100%);
+        }
+
+        .logo {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.75rem;
+            font-weight: 500;
+            letter-spacing: -0.02em;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 32px; height: 32px;
+            background: var(--ink);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--paper);
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .page-count {
+            font-size: 0.85rem;
+            color: var(--warm-gray);
+            margin-right: 0.5rem;
+        }
+
+        .btn {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: 0.65rem 1.25rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--ink);
+            color: var(--paper);
+        }
+        .btn-primary:hover {
+            background: #2d2d2d;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px var(--shadow-deep);
+        }
+        .btn-primary:disabled {
+            background: var(--warm-gray);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--ink);
+            border: 1.5px solid var(--ink);
+        }
+        .btn-secondary:hover {
+            background: var(--ink);
+            color: var(--paper);
+        }
+
+        .btn-danger {
+            background: transparent;
+            color: var(--danger);
+            border: 1.5px solid var(--danger);
+        }
+        .btn-danger:hover {
+            background: var(--danger);
+            color: var(--paper);
+        }
+
+        /* Upload zone */
+        .upload-zone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 2rem;
+            animation: fadeIn 0.6s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .upload-area {
+            width: 100%;
+            max-width: 560px;
+            aspect-ratio: 16/9;
+            border: 2px dashed var(--warm-gray);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--cream);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, var(--accent) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .upload-area:hover { border-color: var(--accent); transform: scale(1.01); }
+        .upload-area:hover::before { opacity: 0.1; }
+        .upload-area.drag-over {
+            border-color: var(--accent-deep);
+            background: rgba(196, 167, 125, 0.1);
+            transform: scale(1.02);
+        }
+
+        .upload-content { text-align: center; z-index: 1; }
+
+        .upload-icon {
+            width: 72px; height: 72px;
+            margin: 0 auto 1.25rem;
+            background: var(--paper);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 32px var(--shadow);
+        }
+        .upload-icon svg { width: 32px; height: 32px; stroke: var(--accent-deep); }
+
+        .upload-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 0.4rem;
+        }
+        .upload-subtitle { color: var(--warm-gray); font-size: 0.85rem; }
+
+        /* Editor */
+        .editor { display: none; }
+        .editor.active { display: block; }
+        .upload-zone.hidden { display: none; }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 3rem;
+            border-bottom: 1px solid var(--shadow);
+            background: var(--cream);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .file-chips {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .file-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            color: var(--paper);
+            transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
+        }
+
+        .file-chip.draggable {
+            cursor: grab;
+        }
+        .file-chip.draggable:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px var(--shadow-deep);
+        }
+
+        .file-chip.dragging-chip { opacity: 0.4; }
+        .file-chip.chip-drag-over {
+            outline: 2px solid var(--paper);
+            outline-offset: 1px;
+        }
+
+        .file-chip.disabled {
+            opacity: 0.7;
+            cursor: default;
+        }
+
+        .file-chip .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+        }
+
+        .chips-hint {
+            font-size: 0.7rem;
+            color: var(--warm-gray);
+            font-style: italic;
+        }
+
+        /* Page grid */
+        .page-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 1.25rem;
+            padding: 2rem 3rem 4rem;
+        }
+
+        .page-card {
+            position: relative;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px var(--shadow);
+            overflow: hidden;
+            cursor: grab;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            user-select: none;
+            animation: cardIn 0.3s ease both;
+        }
+
+        @keyframes cardIn {
+            from { opacity: 0; transform: scale(0.92); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .page-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px var(--shadow-deep);
+        }
+
+        .page-card.dragging {
+            opacity: 0.4;
+            transform: scale(0.95);
+        }
+
+        .page-card.drag-over-card {
+            outline: 2px solid var(--accent-deep);
+            outline-offset: 2px;
+        }
+
+        .page-thumb {
+            width: 100%;
+            aspect-ratio: 0.707;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f0ede8;
+            overflow: hidden;
+        }
+
+        .page-thumb canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .page-info {
+            padding: 0.5rem 0.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--shadow);
+        }
+
+        .page-label {
+            font-size: 0.7rem;
+            color: var(--warm-gray);
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .page-label .color-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .page-label span {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .page-remove {
+            width: 22px; height: 22px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--warm-gray);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            font-size: 1rem;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .page-remove:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .page-number {
+            position: absolute;
+            top: 6px; left: 6px;
+            background: rgba(26,26,26,0.7);
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(250,248,245,0.85);
+            z-index: 100;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+        .loading-overlay.active { display: flex; }
+
+        .spinner {
+            width: 36px; height: 36px;
+            border: 3px solid var(--cream);
+            border-top-color: var(--accent-deep);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-text {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.1rem;
+            color: var(--warm-gray);
+        }
+
+        /* Empty state after removing all pages */
+        .empty-state {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem;
+            color: var(--warm-gray);
+            text-align: center;
+        }
+        .empty-state.active { display: flex; }
+        .empty-state h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.4rem;
+            font-weight: 500;
+            margin-bottom: 0.4rem;
+            color: var(--ink);
+        }
+
+        /* Drop indicator line between cards */
+        .drop-indicator {
+            position: absolute;
+            width: 3px;
+            top: 0;
+            bottom: 0;
+            background: var(--accent-deep);
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        @media (max-width: 600px) {
+            header { padding: 1rem 1.5rem; }
+            .toolbar { padding: 0.75rem 1.5rem; }
+            .page-grid { padding: 1.5rem; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 1rem; }
+            .logo { font-size: 1.35rem; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <div class="logo-icon">F</div>
+            Folio
+        </div>
+        <div class="header-actions">
+            <span class="page-count" id="pageCount"></span>
+            <button class="btn btn-secondary" id="addMoreBtn" style="display:none" onclick="fileInput.click()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add PDFs
+            </button>
+            <button class="btn btn-danger" id="clearBtn" style="display:none" onclick="clearAll()">Clear All</button>
+            <button class="btn btn-primary" id="mergeBtn" style="display:none" onclick="mergePDFs()" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Merged PDF
+            </button>
+        </div>
+    </header>
+
+    <div class="upload-zone" id="uploadZone">
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-content">
+                <div class="upload-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="18" x2="12" y2="12"/>
+                        <line x1="9" y1="15" x2="12" y2="12"/>
+                        <line x1="15" y1="15" x2="12" y2="12"/>
+                    </svg>
+                </div>
+                <h2 class="upload-title">Drop your PDFs here</h2>
+                <p class="upload-subtitle">or click to browse &mdash; select multiple files</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="editor" id="editor">
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <div class="file-chips" id="fileChips"></div>
+            </div>
+        </div>
+        <div class="empty-state" id="emptyState">
+            <h3>No pages remaining</h3>
+            <p>Add more PDFs or clear and start over.</p>
+        </div>
+        <div class="page-grid" id="pageGrid"></div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingText">Loading pages...</div>
+    </div>
+
+    <input type="file" id="fileInput" accept=".pdf" multiple style="display:none">
+
+    <script>
+        if (location.protocol === 'file:') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+        } else {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
+        const FILE_COLORS = [
+            '#5b7a6f', '#7a5b5b', '#5b6a7a', '#7a6f5b', '#6b5b7a',
+            '#5b7a7a', '#7a5b6f', '#6a7a5b', '#5b5b7a', '#7a7a5b'
+        ];
+
+        let pages = [];       // { id, fileIndex, fileName, pageNum, pdfBytes }
+        let fileNames = [];
+        let fileColors = [];
+        let nextId = 0;
+        // Returns true if pages from any file are non-contiguous (interleaved)
+        function arePagesMixed() {
+            const seen = new Set();
+            let lastFile = null;
+            for (const p of pages) {
+                if (p.fileIndex !== lastFile) {
+                    if (seen.has(p.fileIndex)) return true;
+                    seen.add(p.fileIndex);
+                    lastFile = p.fileIndex;
+                }
+            }
+            return false;
+        }
+
+        const uploadZone = document.getElementById('uploadZone');
+        const uploadArea = document.getElementById('uploadArea');
+        const editor = document.getElementById('editor');
+        const pageGrid = document.getElementById('pageGrid');
+        const fileChips = document.getElementById('fileChips');
+        const mergeBtn = document.getElementById('mergeBtn');
+        const addMoreBtn = document.getElementById('addMoreBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const pageCount = document.getElementById('pageCount');
+        const emptyState = document.getElementById('emptyState');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const fileInput = document.getElementById('fileInput');
+
+        // Upload events
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+        uploadArea.addEventListener('drop', e => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        // Also allow dropping on the page grid area when editor is visible
+        document.addEventListener('dragover', e => {
+            if (editor.classList.contains('active') && !e.target.closest('.page-card')) {
+                e.preventDefault();
+            }
+        });
+        document.addEventListener('drop', e => {
+            if (editor.classList.contains('active') && e.dataTransfer.files.length > 0) {
+                e.preventDefault();
+                handleFiles(e.dataTransfer.files);
+            }
+        });
+
+        fileInput.addEventListener('change', e => {
+            handleFiles(e.target.files);
+            fileInput.value = '';
+        });
+
+        async function handleFiles(fileList) {
+            const pdfFiles = Array.from(fileList).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
+            if (pdfFiles.length === 0) return;
+
+            loadingOverlay.classList.add('active');
+
+            for (const file of pdfFiles) {
+                const fileIndex = fileNames.length;
+                const name = file.name.replace(/\.pdf$/i, '');
+                fileNames.push(name);
+                fileColors.push(FILE_COLORS[fileIndex % FILE_COLORS.length]);
+
+                const rawBytes = new Uint8Array(await file.arrayBuffer());
+                const pdf = await pdfjsLib.getDocument({ data: rawBytes.slice() }).promise;
+
+                loadingText.textContent = `Loading ${name} (${pdf.numPages} pages)...`;
+
+                for (let p = 1; p <= pdf.numPages; p++) {
+                    pages.push({
+                        id: nextId++,
+                        fileIndex,
+                        fileName: name,
+                        pageNum: p,
+                        pdfBytes: rawBytes
+                    });
+                }
+            }
+
+            loadingOverlay.classList.remove('active');
+            showEditor();
+        }
+
+        function showEditor() {
+            uploadZone.classList.add('hidden');
+            editor.classList.add('active');
+            addMoreBtn.style.display = '';
+            clearBtn.style.display = '';
+            mergeBtn.style.display = '';
+            renderAll();
+        }
+
+        function renderAll() {
+            renderChips();
+            renderGrid();
+            updateCount();
+        }
+
+        function renderChips() {
+            const usedIndices = [...new Set(pages.map(p => p.fileIndex))];
+            const canDrag = !arePagesMixed() && usedIndices.length > 1;
+
+            fileChips.innerHTML = usedIndices.map(i =>
+                `<div class="file-chip ${canDrag ? 'draggable' : (usedIndices.length > 1 ? 'disabled' : '')}"
+                     ${canDrag ? 'draggable="true"' : ''}
+                     data-file-index="${i}"
+                     style="background:${fileColors[i]}">
+                    <span class="dot"></span>${fileNames[i]}
+                </div>`
+            ).join('');
+
+            // Show hint when chips are draggable
+            const existingHint = fileChips.querySelector('.chips-hint');
+            if (existingHint) existingHint.remove();
+            if (canDrag) {
+                const hint = document.createElement('span');
+                hint.className = 'chips-hint';
+                hint.textContent = 'drag to reorder files';
+                fileChips.appendChild(hint);
+            }
+
+            if (canDrag) attachChipDragListeners();
+        }
+
+        function attachChipDragListeners() {
+            let dragChipIndex = null;
+            const chips = fileChips.querySelectorAll('.file-chip');
+
+            chips.forEach(chip => {
+                chip.addEventListener('dragstart', e => {
+                    dragChipIndex = parseInt(chip.dataset.fileIndex);
+                    chip.classList.add('dragging-chip');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', 'chip');
+                });
+
+                chip.addEventListener('dragend', () => {
+                    chip.classList.remove('dragging-chip');
+                    chips.forEach(c => c.classList.remove('chip-drag-over'));
+                    dragChipIndex = null;
+                });
+
+                chip.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    if (dragChipIndex === null) return;
+                    e.dataTransfer.dropEffect = 'move';
+                    chips.forEach(c => c.classList.remove('chip-drag-over'));
+                    chip.classList.add('chip-drag-over');
+                });
+
+                chip.addEventListener('dragleave', () => {
+                    chip.classList.remove('chip-drag-over');
+                });
+
+                chip.addEventListener('drop', e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    chips.forEach(c => c.classList.remove('chip-drag-over'));
+                    const targetFileIndex = parseInt(chip.dataset.fileIndex);
+                    if (dragChipIndex === null || dragChipIndex === targetFileIndex) return;
+
+                    reorderFileBlocks(dragChipIndex, targetFileIndex);
+                });
+            });
+        }
+
+        function reorderFileBlocks(fromFileIndex, toFileIndex) {
+            // Extract pages grouped by current file order
+            const fileOrder = [];
+            const seen = new Set();
+            for (const p of pages) {
+                if (!seen.has(p.fileIndex)) {
+                    seen.add(p.fileIndex);
+                    fileOrder.push(p.fileIndex);
+                }
+            }
+
+            const fromPos = fileOrder.indexOf(fromFileIndex);
+            const toPos = fileOrder.indexOf(toFileIndex);
+            if (fromPos === -1 || toPos === -1) return;
+
+            // Move the file in the order
+            fileOrder.splice(fromPos, 1);
+            fileOrder.splice(toPos, 0, fromFileIndex);
+
+            // Rebuild pages array following new file order
+            const grouped = new Map();
+            for (const p of pages) {
+                if (!grouped.has(p.fileIndex)) grouped.set(p.fileIndex, []);
+                grouped.get(p.fileIndex).push(p);
+            }
+
+            pages = [];
+            for (const fi of fileOrder) {
+                if (grouped.has(fi)) pages.push(...grouped.get(fi));
+            }
+
+            renderAll();
+        }
+
+        function updateCount() {
+            const n = pages.length;
+            pageCount.textContent = n === 0 ? '' : `${n} page${n !== 1 ? 's' : ''}`;
+            mergeBtn.disabled = n === 0;
+            emptyState.classList.toggle('active', n === 0);
+            pageGrid.style.display = n === 0 ? 'none' : '';
+        }
+
+        async function renderGrid() {
+            pageGrid.innerHTML = '';
+
+            for (let i = 0; i < pages.length; i++) {
+                const p = pages[i];
+                const card = document.createElement('div');
+                card.className = 'page-card';
+                card.dataset.index = i;
+                card.draggable = true;
+                card.style.animationDelay = `${Math.min(i * 30, 300)}ms`;
+
+                card.innerHTML = `
+                    <div class="page-number">${i + 1}</div>
+                    <div class="page-thumb"><canvas></canvas></div>
+                    <div class="page-info">
+                        <div class="page-label">
+                            <span class="color-dot" style="background:${fileColors[p.fileIndex]}"></span>
+                            <span title="${p.fileName} p.${p.pageNum}">${p.fileName} p.${p.pageNum}</span>
+                        </div>
+                        <button class="page-remove" title="Remove page" data-id="${p.id}">&times;</button>
+                    </div>
+                `;
+
+                pageGrid.appendChild(card);
+                renderThumb(card.querySelector('canvas'), p);
+            }
+
+            attachDragListeners();
+            attachRemoveListeners();
+            updateCount();
+        }
+
+        async function renderThumb(canvas, page) {
+            try {
+                const pdf = await pdfjsLib.getDocument({ data: page.pdfBytes.slice() }).promise;
+                const pg = await pdf.getPage(page.pageNum);
+                const vp = pg.getViewport({ scale: 1 });
+                const scale = 240 / vp.width;
+                const viewport = pg.getViewport({ scale });
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                await pg.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+            } catch (e) {
+                canvas.parentElement.textContent = 'Preview unavailable';
+            }
+        }
+
+        function attachRemoveListeners() {
+            pageGrid.querySelectorAll('.page-remove').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const id = parseInt(btn.dataset.id);
+                    pages = pages.filter(p => p.id !== id);
+                    renderAll();
+                });
+            });
+        }
+
+        /* ── Drag-and-drop reorder ── */
+        let dragIndex = null;
+
+        function attachDragListeners() {
+            const cards = pageGrid.querySelectorAll('.page-card');
+
+            cards.forEach(card => {
+                card.addEventListener('dragstart', e => {
+                    dragIndex = parseInt(card.dataset.index);
+                    card.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', dragIndex);
+                });
+
+                card.addEventListener('dragend', () => {
+                    card.classList.remove('dragging');
+                    clearDropIndicators();
+                    dragIndex = null;
+                });
+
+                card.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragIndex === null) return;
+                    clearDropIndicators();
+                    card.classList.add('drag-over-card');
+                });
+
+                card.addEventListener('dragleave', () => {
+                    card.classList.remove('drag-over-card');
+                });
+
+                card.addEventListener('drop', e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    clearDropIndicators();
+                    const fromIndex = dragIndex;
+                    const toIndex = parseInt(card.dataset.index);
+                    if (fromIndex === null || fromIndex === toIndex) return;
+
+                    const moved = pages.splice(fromIndex, 1)[0];
+                    pages.splice(toIndex, 0, moved);
+                    renderAll();
+                });
+            });
+        }
+
+        function clearDropIndicators() {
+            pageGrid.querySelectorAll('.drag-over-card').forEach(c => c.classList.remove('drag-over-card'));
+        }
+
+        /* ── Merge & Download ── */
+        async function mergePDFs() {
+            if (pages.length === 0) return;
+
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'Merging PDF...';
+
+            try {
+                const merged = await PDFLib.PDFDocument.create();
+
+                // Cache loaded docs by fileIndex to avoid reloading the same file
+                const docCache = new Map();
+
+                for (let i = 0; i < pages.length; i++) {
+                    const p = pages[i];
+                    loadingText.textContent = `Merging page ${i + 1} of ${pages.length}...`;
+
+                    const cacheKey = p.fileIndex + ':' + p.pdfBytes.byteLength;
+                    let srcDoc;
+                    if (docCache.has(cacheKey)) {
+                        srcDoc = docCache.get(cacheKey);
+                    } else {
+                        srcDoc = await PDFLib.PDFDocument.load(p.pdfBytes);
+                        docCache.set(cacheKey, srcDoc);
+                    }
+
+                    const [copiedPage] = await merged.copyPages(srcDoc, [p.pageNum - 1]);
+                    merged.addPage(copiedPage);
+                }
+
+                const pdfBytes = await merged.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'merged.pdf';
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('Error merging PDFs: ' + err.message);
+            }
+
+            loadingOverlay.classList.remove('active');
+        }
+
+        function clearAll() {
+            pages = [];
+            fileNames = [];
+            fileColors = [];
+            nextId = 0;
+            editor.classList.remove('active');
+            uploadZone.classList.remove('hidden');
+            addMoreBtn.style.display = 'none';
+            clearBtn.style.display = 'none';
+            mergeBtn.style.display = 'none';
+            pageCount.textContent = '';
+            pageGrid.innerHTML = '';
+            fileChips.innerHTML = '';
+        }
+    </script>
+</body>
+</html>
