@@ -523,16 +523,17 @@ function render() {
               oninput="editedSummary=this.value">${esc(editedSummary)}</textarea>
   </div>`;
 
-  // --- Sub-clusters (inline pills + collapsible editor) ---
+  // --- Sub-clusters (inline pills) ---
+  const hasOverride = overrideSCs.length && overrideSCs.join(',') !== currentSCs.join(',');
   html += `<div class="field-row" style="align-items:flex-start; margin-top:4px;">
     <div class="section-label">Clusters</div>
     <div style="flex:1">`;
-  html += currentSCs.map(sc => `<span class="sc-pill">${esc(sc)}</span>`).join('');
-  if (overrideSCs.length && overrideSCs.join(',') !== currentSCs.join(',')) {
-    html += `<br>`;
+  if (hasOverride) {
     html += overrideSCs.map(sc => `<span class="sc-pill override">${esc(sc)}</span>`).join('');
+    html += `<span class="llm-hint" style="display:block;margin-top:4px">LLM: ${currentSCs.join(', ')}</span>`;
+  } else {
+    html += currentSCs.map(sc => `<span class="sc-pill">${esc(sc)}</span>`).join('');
   }
-  // no Edit button — clusters always expanded
   html += `</div></div>`;
 
   html += `<div class="selector" style="border-top:none;padding-top:0;">
@@ -657,7 +658,7 @@ function filterSCs(query) {
 // --- Save ---
 function saveAndNext() {
   const e = entries[filteredIdx[curIdx]];
-  const overrideSC = Array.from(selectedSCs).join(', ');
+  const overrideSC = Array.from(selectedSCs).join('; ');
   saveEntry(e, overrideSC, selectedFocus, selectedSpecificity, editedSummary);
   next();
 }
@@ -718,7 +719,7 @@ function updateStats() {
 }
 
 // --- Utilities ---
-function splitSC(s) { return (s || '').split(/;\s*|,\s*/).map(x => x.trim()).filter(Boolean); }
+function splitSC(s) { return (s || '').split(/;\s*/).map(x => x.trim()).filter(Boolean); }
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function hashCode(s) { let h = 0; for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return Math.abs(h); }
 
