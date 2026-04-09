@@ -486,7 +486,6 @@ function render() {
   html += `<div class="field-row">
     <div class="section-label">Focus</div>
     <div class="radio-group">`;
-  const isNewFocus = selectedFocus.startsWith('NEW:') || (selectedFocus && !FOCUS_OPTIONS.includes(selectedFocus));
   for (const opt of FOCUS_OPTIONS) {
     const checked = selectedFocus === opt;
     html += `<label class="${checked ? 'selected' : ''}">
@@ -494,15 +493,6 @@ function render() {
              onchange="selectFocus(this.value)"> ${esc(opt)}
     </label>`;
   }
-  html += `<label class="${isNewFocus ? 'selected' : ''}">
-    <input type="radio" name="focus" value="__new__" ${isNewFocus ? 'checked' : ''}
-           onchange="document.getElementById('newFocusInput').focus();selectFocus('NEW: ')"> new:
-  </label>`;
-  html += `<input id="newFocusInput" type="text" style="width:120px;font-size:12px;padding:2px 6px;
-           border:1px solid var(--border);border-radius:4px;${isNewFocus ? '' : 'opacity:0.4;'}"
-           value="${esc(isNewFocus ? selectedFocus.replace(/^NEW:\s*/, '') : '')}"
-           oninput="selectFocus('NEW: '+this.value)"
-           onfocus="document.querySelector('input[value=__new__]').checked=true">`;
   html += `</div>`;
   if (e.focus && e.focus !== selectedFocus) {
     html += `<span class="llm-hint">LLM: ${esc(e.focus)}</span>`;
@@ -593,6 +583,16 @@ function render() {
     }
     html += '</div></div>';
   }
+
+  // "New" sub-cluster free-text entry
+  html += `<div style="margin-top:8px;display:flex;gap:6px;align-items:center;">
+    <span style="font-size:12px;color:var(--muted);font-weight:600;">Add new:</span>
+    <input id="newSCInput" type="text" style="flex:1;font-size:12px;padding:4px 8px;
+           border:1px solid var(--border);border-radius:4px;"
+           placeholder="Type a sub-cluster name not in the list above">
+    <button style="font-size:12px;padding:3px 10px;" onclick="addNewSC()">Add</button>
+  </div>`;
+
   html += '</div></div>'; // end collapsible-body, selector
 
   card.innerHTML = html;
@@ -611,8 +611,6 @@ function selectFocus(val) {
   document.querySelectorAll('input[name=focus]').forEach(r => {
     r.closest('label').classList.toggle('selected', r.checked);
   });
-  const ni = document.getElementById('newFocusInput');
-  if (ni) ni.style.opacity = val.startsWith('NEW:') ? '1' : '0.4';
 }
 
 function selectSpecificity(val) {
@@ -625,6 +623,15 @@ function selectSpecificity(val) {
 function toggleCluster(el) {
   el.querySelector('.arrow').classList.toggle('open');
   el.nextElementSibling.classList.toggle('open');
+}
+
+function addNewSC() {
+  const input = document.getElementById('newSCInput');
+  const val = (input.value || '').trim();
+  if (!val) return;
+  selectedSCs.add('NEW: ' + val);
+  input.value = '';
+  render();
 }
 
 function toggleSC(cb) {
