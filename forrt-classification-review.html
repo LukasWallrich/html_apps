@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FORRT Classification Review</title>
+<style>
+  :root {
+    --blue: #2c5282; --light: #ebf4ff; --accent: #3182ce;
+    --ok: #38a169; --warn: #d69e2e; --muted: #718096;
+    --bg: #f7fafc; --card: #fff; --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: #2d3748; line-height: 1.5; }
+
+  .header { background: var(--blue); color: #fff; padding: 12px 24px;
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .progress { font-size: 13px; opacity: 0.9; display: flex; align-items: center; gap: 8px; }
+  .progress-bar { width: 120px; height: 6px; background: rgba(255,255,255,0.3); border-radius: 3px; }
+  .progress-fill { height: 100%; background: #fff; border-radius: 3px; transition: width 0.3s; }
+
+  .container { max-width: 920px; margin: 0 auto; padding: 16px; }
+
+  .nav-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px;
+           background: var(--card); cursor: pointer; font-size: 13px; }
+  button:hover { background: var(--light); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { background: var(--blue); }
+  button.success { background: var(--ok); color: #fff; border-color: var(--ok); }
+  button.success:hover { opacity: 0.9; }
+  .spacer { flex: 1; }
+  .filter-group { display: flex; gap: 3px; }
+  .filter-group button.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+          padding: 20px; margin-bottom: 12px; }
+  .card h2 { font-size: 16px; margin-bottom: 6px; color: var(--blue); }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 600; white-space: nowrap; }
+  .badge.high { background: #c6f6d5; color: #276749; }
+  .badge.medium { background: #fefcbf; color: #975a16; }
+  .badge.low { background: #fed7d7; color: #9b2c2c; }
+  .badge.known { background: #e9d8fd; color: #553c9a; }
+  .badge.source { background: #e2e8f0; color: #4a5568; }
+  .badge.saving { background: #fed7d7; color: #9b2c2c; animation: pulse 1s infinite; }
+  .badge.saved { background: #c6f6d5; color: #276749; }
+  @keyframes pulse { 50% { opacity: 0.5; } }
+
+  .abstract-wrap { font-size: 13px; color: #4a5568; margin-bottom: 8px; }
+  .abstract-wrap .abstract-text { white-space: pre-wrap; }
+  .abstract-wrap:not(.expanded) .abstract-text { display: -webkit-box; -webkit-line-clamp: 3;
+              -webkit-box-orient: vertical; overflow: hidden; }
+  .toggle-abstract { font-size: 12px; color: var(--accent); cursor: pointer;
+                     border: none; background: none; padding: 0; }
+
+  .section-label { font-size: 12px; color: var(--muted); text-transform: uppercase;
+                   letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 600; }
+  .sc-pill { display: inline-block; padding: 2px 10px; margin: 2px; border-radius: 14px;
+             font-size: 12px; background: var(--light); color: var(--blue); border: 1px solid #bee3f8; }
+  .sc-pill.alt { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+  .sc-pill.override { background: #f0fff4; color: #276749; border-color: #9ae6b4; }
+
+  .reasoning { font-size: 12px; color: var(--muted); font-style: italic; margin: 8px 0; }
+  .current-section { margin-bottom: 12px; }
+
+  .selector { border-top: 1px solid var(--border); padding-top: 14px; }
+  .selector h3 { font-size: 14px; margin-bottom: 6px; }
+  .search-box { width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+                font-size: 13px; margin-bottom: 10px; }
+  .cluster-group { margin-bottom: 4px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .cluster-header { display: flex; align-items: center; cursor: pointer;
+                    padding: 6px 10px; background: #f8fafc; user-select: none; }
+  .cluster-header:hover { background: var(--light); }
+  .arrow { margin-right: 8px; font-size: 12px; transition: transform 0.15s; color: var(--muted); display: inline-block; }
+  .arrow.open { transform: rotate(90deg); }
+  .cluster-name { font-weight: 600; font-size: 13px; flex: 1; }
+  .cluster-count { font-size: 11px; color: var(--ok); font-weight: 600; }
+
+  .sc-list { padding: 0; max-height: 0; overflow: hidden; transition: max-height 0.2s; }
+  .sc-list.open { max-height: 2000px; }
+  .sc-item { display: flex; align-items: flex-start; padding: 5px 10px 5px 28px;
+             border-top: 1px solid #f0f0f0; }
+  .sc-item:hover { background: #fafafa; }
+  .sc-item input[type=checkbox] { margin-top: 3px; margin-right: 8px; flex-shrink: 0;
+                                   width: 16px; height: 16px; cursor: pointer; }
+  .sc-item label { font-size: 13px; cursor: pointer; flex: 1; }
+  .sc-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .sc-item.selected { background: #f0fff4; }
+  .sc-item.selected label { font-weight: 600; color: var(--blue); }
+  .sc-item.hidden { display: none; }
+
+  .loading { text-align: center; padding: 40px; color: var(--muted); }
+  .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid var(--border);
+             border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .hint { font-size: 11px; color: var(--muted); margin-top: 8px; }
+  kbd { background: #edf2f7; padding: 1px 5px; border-radius: 3px; font-size: 11px;
+        border: 1px solid var(--border); }
+  .status-msg { font-size: 12px; padding: 2px 8px; }
+
+  .setup-banner { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+                  padding: 12px 16px; margin-bottom: 12px; font-size: 13px; }
+  .setup-banner input { width: 100%; padding: 6px 8px; border: 1px solid var(--border);
+                        border-radius: 4px; font-size: 12px; margin-top: 6px; font-family: monospace; }
+  .setup-banner button { margin-top: 6px; }
+  .sync-indicator { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+                    margin-right: 4px; vertical-align: middle; }
+  .sync-indicator.on { background: var(--ok); }
+  .sync-indicator.off { background: var(--warn); }
+
+  .jump-input { width: 60px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px;
+                font-size: 13px; text-align: center; }
+
+  /* --- Focus/Specificity/Summary styles --- */
+  .field-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+  .field-row .section-label { margin-bottom: 0; min-width: 75px; flex-shrink: 0; }
+  .radio-group { display: flex; flex-wrap: wrap; gap: 3px; }
+  .radio-group label { display: flex; align-items: center; gap: 2px; font-size: 12px;
+                       padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px;
+                       cursor: pointer; background: var(--card); transition: all 0.15s; }
+  .radio-group label:hover { background: var(--light); }
+  .radio-group input[type=radio] { width: 12px; height: 12px; cursor: pointer; margin: 0; }
+  .radio-group label.selected { background: var(--light); border-color: var(--accent);
+                                 font-weight: 600; color: var(--blue); }
+  .summary-textarea { width: 100%; height: 3.6lh; padding: 4px 8px; border: 1px solid var(--border);
+                      border-radius: 4px; font-size: 12px; font-family: inherit; line-height: 1.4;
+                      resize: vertical; }
+  .summary-textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(49,130,206,0.15); }
+  .llm-hint { font-size: 11px; color: var(--muted); margin-left: 4px; }
+  .collapsible-header { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
+  .collapsible-header:hover { color: var(--accent); }
+  .collapsible-body { overflow: hidden; transition: max-height 0.2s; }
+  .collapsible-body.collapsed { max-height: 0; }
+  .collapsible-body.expanded { max-height: 2000px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>FORRT Classification Review</h1>
+  <div class="progress">
+    <span id="statsText">Loading...</span>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="nav-bar">
+    <button onclick="prev()" title="Previous (&larr;)">&#8592; Prev</button>
+    <button onclick="next()" title="Next (&rarr;)">Next &#8594;</button>
+    <span style="font-size:12px;color:var(--muted);margin:0 4px;">
+      <input class="jump-input" id="jumpInput" type="number" min="1"
+             onchange="jumpTo(this.value)" title="Jump to entry #">
+      / <span id="totalFiltered">0</span>
+    </span>
+    <div class="spacer"></div>
+    <div class="filter-group">
+      <button id="fAll" class="active" onclick="setFilter('all')">All</button>
+      <button id="fUnreviewed" onclick="setFilter('unreviewed')">Unreviewed</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="primary" onclick="saveAndNext()" title="Save & next (Enter / Space)">Save &amp; Next</button>
+    <button onclick="exportOverrides()" title="Download all overrides as CSV">&#8681; Export</button>
+    <span id="saveStatus"></span>
+  </div>
+
+  <div id="setupBanner"></div>
+
+  <div id="entryCard" class="card">
+    <div class="loading"><div class="spinner"></div><br>Loading data from Google Sheet...</div>
+  </div>
+
+  <div class="hint">
+    <kbd>&#8592;</kbd> <kbd>&#8594;</kbd> navigate &nbsp;
+    <kbd>Enter</kbd> / <kbd>Space</kbd> save &amp; next &nbsp;
+    <kbd>/</kbd> search sub-clusters
+  </div>
+</div>
+
+<script>
+const SHEET_ID = '170CGZDYdT8K1czVwML_s0fdiv4lWc_N4O9p8OQZQ8vE';
+const REVIEW_GID = '1101357105';
+const REF_GID = '990226645';
+
+const FOCUS_OPTIONS = ['overview', 'evidence', 'practice/tools', 'teaching/training', 'advocacy', 'critique', 'policies'];
+const SPECIFICITY_OPTIONS = ['Generalist', 'Discipline-specific', 'Narrow'];
+
+// Column indices for sheet writes (1-based)
+const COL = {
+  overrideSC: 12,       // L
+  overrideFocus: 16,    // P
+  overrideSpecificity: 17, // Q
+  overrideSummary: 18,  // R
+  reviewedBy: 19,       // S
+};
+
+let taxonomy = {};
+let entries = [];
+let filteredIdx = [];
+let curIdx = 0;
+let selectedSCs = new Set();
+let selectedFocus = '';
+let selectedSpecificity = '';
+let editedSummary = '';
+let filter = 'all';
+let writeProxyUrl = localStorage.getItem('forrt_write_proxy') || '';
+let reviewerName = localStorage.getItem('forrt_reviewer_name') || '';
+
+// --- CSV parsing ---
+function parseCSV(text) {
+  const rows = []; let row = []; let cell = ''; let inQuote = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuote) {
+      if (ch === '"' && text[i+1] === '"') { cell += '"'; i++; }
+      else if (ch === '"') { inQuote = false; }
+      else { cell += ch; }
+    } else {
+      if (ch === '"') { inQuote = true; }
+      else if (ch === ',') { row.push(cell); cell = ''; }
+      else if (ch === '\n' || (ch === '\r' && text[i+1] === '\n')) {
+        row.push(cell); cell = ''; rows.push(row); row = [];
+        if (ch === '\r') i++;
+      } else { cell += ch; }
+    }
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+
+// --- Data loading ---
+async function loadCSV(gid) {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`Failed to fetch sheet (HTTP ${resp.status}). Is the sheet shared publicly?`);
+  return parseCSV(await resp.text());
+}
+
+async function init() {
+  try {
+    const [refRows, reviewRows] = await Promise.all([loadCSV(REF_GID), loadCSV(REVIEW_GID)]);
+
+    // Parse taxonomy
+    for (let i = 1; i < refRows.length; i++) {
+      const [cluster, sc, desc] = refRows[i];
+      if (!cluster || !sc) continue;
+      if (!taxonomy[cluster]) taxonomy[cluster] = [];
+      taxonomy[cluster].push({ name: sc.trim(), description: (desc || '').trim() });
+    }
+
+    // Parse review entries
+    // A:Row, B:Title, C:Abstract, D:Cluster(s), E:Sub_Cluster(s), F:Sub_Cluster_Description(s),
+    // G:Confidence, H:Source, I:Reasoning, J:LLM_Alternative, K:LLM_Alt_Descriptions,
+    // L:Reviewer_Override_Sub_Clusters,
+    // M:Focus, N:Specificity, O:Summary,
+    // P:Reviewer_Override_Focus, Q:Reviewer_Override_Specificity, R:Reviewer_Override_Summary
+    for (let i = 1; i < reviewRows.length; i++) {
+      const r = reviewRows[i];
+      if (!r || !r[1]) continue;
+      entries.push({
+        idx: i - 1,
+        sheetRow: i + 1,
+        sourceRow: r[0],
+        title: r[1] || '',
+        abstract: r[2] || '',
+        clusters: r[3] || '',
+        subClusters: r[4] || '',
+        scDescriptions: r[5] || '',
+        confidence: (r[6] || '').toLowerCase(),
+        source: r[7] || '',
+        reasoning: r[8] || '',
+        llmAlt: r[9] || '',
+        llmAltDesc: r[10] || '',
+        override: r[11] || '',
+        focus: r[12] || '',
+        specificity: r[13] || '',
+        summary: r[14] || '',
+        overrideFocus: r[15] || '',
+        overrideSpecificity: r[16] || '',
+        overrideSummary: r[17] || '',
+        reviewedBy: r[18] || '',
+      });
+    }
+
+    // Load local overrides from localStorage
+    const saved = JSON.parse(localStorage.getItem('forrt_overrides_v2') || '{}');
+    for (const e of entries) {
+      const s = saved[e.sheetRow];
+      if (s) {
+        if (s.sc !== undefined) e.localOverride = s.sc;
+        if (s.focus !== undefined) e.localOverrideFocus = s.focus;
+        if (s.specificity !== undefined) e.localOverrideSpecificity = s.specificity;
+        if (s.summary !== undefined) e.localOverrideSummary = s.summary;
+      }
+    }
+
+    applyFilter();
+    render();
+    updateStats();
+  } catch (err) {
+    document.getElementById('entryCard').innerHTML =
+      `<div class="loading" style="color:#e53e3e">Error loading data: ${esc(err.message)}<br>
+       <button onclick="location.reload()" style="margin-top:12px">Retry</button></div>`;
+  }
+}
+
+// --- Write proxy ---
+async function writeToSheet(sheetRow, col, value) {
+  if (!writeProxyUrl) return false;
+  try {
+    const resp = await fetch(writeProxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ sheetRow, col, value }),
+      redirect: 'follow',
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return true;
+  } catch (err) {
+    console.warn('Sheet write failed:', err.message);
+    return false;
+  }
+}
+
+function renderSetupBanner() {
+  const el = document.getElementById('setupBanner');
+  if (writeProxyUrl) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--ok);margin-bottom:8px">
+      <span class="sync-indicator on"></span> Sheet sync active
+      <button style="font-size:11px;padding:2px 8px;margin-left:8px"
+              onclick="configureProxy()">Change</button>
+      <button style="font-size:11px;padding:2px 8px"
+              onclick="writeProxyUrl='';localStorage.removeItem('forrt_write_proxy');renderSetupBanner()">Disconnect</button>
+    </div>`;
+  } else {
+    el.innerHTML = `<div class="setup-banner">
+      <strong>Sheet sync not configured</strong> &mdash; reviews save to your browser only.<br>
+      To save directly to the Google Sheet, deploy the
+      <a href="https://github.com/forrtproject/forrtproject.github.io/blob/master/scripts/review_app/WriteProxy.gs"
+         target="_blank">write proxy</a> and paste the URL below:
+      <input id="proxyUrlInput" type="text" placeholder="https://script.google.com/macros/s/.../exec"
+             value="${esc(writeProxyUrl)}">
+      <button onclick="saveProxyUrl()">Connect</button>
+    </div>`;
+  }
+}
+
+function configureProxy() {
+  const url = prompt('Apps Script deployment URL:', writeProxyUrl);
+  if (url !== null) {
+    writeProxyUrl = url.trim();
+    if (writeProxyUrl) localStorage.setItem('forrt_write_proxy', writeProxyUrl);
+    else localStorage.removeItem('forrt_write_proxy');
+    renderSetupBanner();
+    testProxy();
+  }
+}
+
+async function saveProxyUrl() {
+  const input = document.getElementById('proxyUrlInput');
+  writeProxyUrl = (input.value || '').trim();
+  if (!writeProxyUrl) return;
+  localStorage.setItem('forrt_write_proxy', writeProxyUrl);
+  renderSetupBanner();
+  await testProxy();
+}
+
+async function testProxy() {
+  if (!writeProxyUrl) return;
+  try {
+    const resp = await fetch(writeProxyUrl, { redirect: 'follow' });
+    const data = await resp.json();
+    if (data.status) {
+      document.getElementById('saveStatus').innerHTML =
+        '<span class="badge saved">proxy connected &#10003;</span>';
+      setTimeout(() => { document.getElementById('saveStatus').innerHTML = ''; }, 2000);
+    }
+  } catch (e) {
+    document.getElementById('saveStatus').innerHTML =
+      '<span class="badge saving">proxy test failed</span>';
+  }
+}
+
+// --- Export ---
+function exportOverrides() {
+  const saved = JSON.parse(localStorage.getItem('forrt_overrides_v2') || '{}');
+  const rows = [['Sheet_Row', 'Title', 'Original_Sub_Clusters', 'Override_Sub_Clusters',
+                  'Original_Focus', 'Override_Focus', 'Original_Specificity', 'Override_Specificity',
+                  'Original_Summary', 'Override_Summary']];
+  for (const e of entries) {
+    const s = saved[e.sheetRow];
+    if (!s && !e.override && !e.overrideFocus && !e.overrideSpecificity && !e.overrideSummary) continue;
+    rows.push([
+      e.sheetRow, e.title,
+      e.subClusters, s?.sc || e.override || '',
+      e.focus, s?.focus || e.overrideFocus || '',
+      e.specificity, s?.specificity || e.overrideSpecificity || '',
+      e.summary, s?.summary || e.overrideSummary || '',
+    ]);
+  }
+  if (rows.length === 1) { alert('No overrides to export yet.'); return; }
+  const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = 'forrt_review_overrides.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// --- Filter ---
+function isReviewed(e) {
+  return !!e.reviewedBy;
+}
+
+function applyFilter() {
+  filteredIdx = [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (filter === 'unreviewed' && isReviewed(e)) continue;
+    filteredIdx.push(i);
+  }
+  document.getElementById('totalFiltered').textContent = filteredIdx.length;
+}
+
+function setFilter(f) {
+  filter = f;
+  document.querySelectorAll('.filter-group button').forEach(b => b.classList.remove('active'));
+  const id = { all: 'fAll', unreviewed: 'fUnreviewed' }[f];
+  document.getElementById(id).classList.add('active');
+  applyFilter();
+  curIdx = 0;
+  render();
+}
+
+// --- Navigation ---
+function next() { if (curIdx < filteredIdx.length - 1) { curIdx++; render(); } }
+function prev() { if (curIdx > 0) { curIdx--; render(); } }
+function jumpTo(n) {
+  n = parseInt(n);
+  if (n >= 1 && n <= filteredIdx.length) { curIdx = n - 1; render(); }
+}
+
+// --- Render ---
+function render() {
+  const card = document.getElementById('entryCard');
+  if (!filteredIdx.length) {
+    card.innerHTML = '<div class="loading">No entries match this filter.</div>';
+    document.getElementById('jumpInput').value = '';
+    return;
+  }
+  const e = entries[filteredIdx[curIdx]];
+  document.getElementById('jumpInput').value = curIdx + 1;
+
+  const currentSCs = splitSC(e.subClusters);
+  const altSCs = splitSC(e.llmAlt);
+  const overrideSCs = splitSC(e.localOverride || e.override);
+
+  // Pre-select: local override > sheet override > current assignment
+  selectedSCs = new Set(overrideSCs.length ? overrideSCs : currentSCs);
+  selectedFocus = e.localOverrideFocus || e.overrideFocus || e.focus || '';
+  selectedSpecificity = e.localOverrideSpecificity || e.overrideSpecificity || e.specificity || '';
+  editedSummary = e.localOverrideSummary || e.overrideSummary || e.summary || '';
+
+  let html = `
+    <div class="meta">
+      ${e.reviewedBy ? `<span class="badge saved">reviewed by ${esc(e.reviewedBy)}</span>` : ''}
+      <span style="font-size:12px;color:var(--muted)">#${e.sourceRow}</span>
+    </div>
+    <h2>${esc(e.title)}</h2>
+  `;
+
+  if (e.abstract && e.abstract !== '(no abstract)') {
+    html += `
+      <div class="abstract-wrap" id="abstractBox">
+        <span class="abstract-text">${esc(e.abstract)}</span>
+        <button class="toggle-abstract" onclick="document.getElementById('abstractBox').classList.toggle('expanded');this.textContent=this.textContent==='show more'?'show less':'show more'">show more</button>
+      </div>
+    `;
+  }
+
+  // --- Focus (inline row) ---
+  html += `<div class="field-row">
+    <div class="section-label">Focus</div>
+    <div class="radio-group">`;
+  for (const opt of FOCUS_OPTIONS) {
+    const checked = selectedFocus === opt;
+    html += `<label class="${checked ? 'selected' : ''}">
+      <input type="radio" name="focus" value="${esc(opt)}" ${checked ? 'checked' : ''}
+             onchange="selectFocus(this.value)"> ${esc(opt)}
+    </label>`;
+  }
+  html += `</div>`;
+  if (e.focus && e.focus !== selectedFocus) {
+    html += `<span class="llm-hint">LLM: ${esc(e.focus)}</span>`;
+  }
+  html += `</div>`;
+
+  // --- Specificity (inline row) ---
+  html += `<div class="field-row">
+    <div class="section-label">Specificity</div>
+    <div class="radio-group">`;
+  for (const opt of SPECIFICITY_OPTIONS) {
+    const checked = selectedSpecificity === opt;
+    html += `<label class="${checked ? 'selected' : ''}">
+      <input type="radio" name="specificity" value="${esc(opt)}" ${checked ? 'checked' : ''}
+             onchange="selectSpecificity(this.value)"> ${esc(opt)}
+    </label>`;
+  }
+  html += `</div>`;
+  if (e.specificity && e.specificity !== selectedSpecificity) {
+    html += `<span class="llm-hint">LLM: ${esc(e.specificity)}</span>`;
+  }
+  html += `</div>`;
+
+  // --- Summary (compact, inline label) ---
+  html += `<div class="field-row" style="align-items:flex-start;">
+    <div class="section-label">Summary</div>
+    <textarea class="summary-textarea" id="summaryEdit"
+              oninput="editedSummary=this.value">${esc(editedSummary)}</textarea>
+  </div>`;
+
+  // --- Sub-clusters (inline pills + collapsible editor) ---
+  html += `<div class="field-row" style="align-items:flex-start; margin-top:4px;">
+    <div class="section-label">Clusters</div>
+    <div style="flex:1">`;
+  html += currentSCs.map(sc => `<span class="sc-pill">${esc(sc)}</span>`).join('');
+  if (overrideSCs.length && overrideSCs.join(',') !== currentSCs.join(',')) {
+    html += `<br>`;
+    html += overrideSCs.map(sc => `<span class="sc-pill override">${esc(sc)}</span>`).join('');
+  }
+  // no Edit button — clusters always expanded
+  html += `</div></div>`;
+
+  html += `<div class="selector" style="border-top:none;padding-top:0;">
+    <div class="collapsible-header" id="scHeader" onclick="toggleSection('scSection', this)" style="display:none;">
+    </div>
+    <div class="collapsible-body expanded" id="scSection">`;
+
+  // Current/alt/override details inside collapsible
+  if (altSCs.length) {
+    html += `<div class="current-section" style="margin-top:8px"><div class="section-label">LLM alternative</div>`;
+    html += altSCs.map(sc => `<span class="sc-pill alt">${esc(sc)}</span>`).join('');
+    html += `</div>`;
+  }
+
+  if (e.reasoning) {
+    html += `<div class="reasoning">${esc(e.reasoning)}</div>`;
+  }
+
+  html += `<input class="search-box" id="scSearch" type="text" placeholder="Search sub-clusters..."
+           oninput="filterSCs(this.value)">`;
+
+  for (const [cluster, scs] of Object.entries(taxonomy)) {
+    const checkedCount = scs.filter(sc => selectedSCs.has(sc.name)).length;
+    const isOpen = checkedCount > 0;
+    html += `
+      <div class="cluster-group">
+        <div class="cluster-header" onclick="toggleCluster(this)">
+          <span class="arrow ${isOpen ? 'open' : ''}">&#8250;</span>
+          <span class="cluster-name">${esc(cluster)}</span>
+          <span class="cluster-count">${checkedCount ? checkedCount + ' &#10003;' : ''}</span>
+        </div>
+        <div class="sc-list ${isOpen ? 'open' : ''}">
+    `;
+    for (const sc of scs) {
+      const checked = selectedSCs.has(sc.name);
+      const id = 'sc_' + hashCode(sc.name);
+      html += `
+        <div class="sc-item ${checked ? 'selected' : ''}" data-name="${esc(sc.name.toLowerCase())}">
+          <input type="checkbox" id="${id}" value="${esc(sc.name)}"
+                 ${checked ? 'checked' : ''} onchange="toggleSC(this)">
+          <label for="${id}">
+            ${esc(sc.name)}
+            <div class="sc-desc">${esc(sc.description ? sc.description.substring(0, 250) : '')}</div>
+          </label>
+        </div>
+      `;
+    }
+    html += '</div></div>';
+  }
+  html += '</div></div>'; // end collapsible-body, selector
+
+  card.innerHTML = html;
+}
+
+function toggleSection(id, headerEl) {
+  const body = document.getElementById(id);
+  const arrow = headerEl.querySelector('.arrow');
+  body.classList.toggle('collapsed');
+  body.classList.toggle('expanded');
+  arrow.classList.toggle('open');
+}
+
+function selectFocus(val) {
+  selectedFocus = val;
+  document.querySelectorAll('input[name=focus]').forEach(r => {
+    r.closest('label').classList.toggle('selected', r.checked);
+  });
+}
+
+function selectSpecificity(val) {
+  selectedSpecificity = val;
+  document.querySelectorAll('input[name=specificity]').forEach(r => {
+    r.closest('label').classList.toggle('selected', r.checked);
+  });
+}
+
+function toggleCluster(el) {
+  el.querySelector('.arrow').classList.toggle('open');
+  el.nextElementSibling.classList.toggle('open');
+}
+
+function toggleSC(cb) {
+  if (cb.checked) selectedSCs.add(cb.value);
+  else selectedSCs.delete(cb.value);
+  const item = cb.closest('.sc-item');
+  item.classList.toggle('selected', cb.checked);
+  const group = cb.closest('.cluster-group');
+  const n = group.querySelectorAll('input:checked').length;
+  group.querySelector('.cluster-count').innerHTML = n ? n + ' &#10003;' : '';
+}
+
+function filterSCs(query) {
+  query = query.toLowerCase().trim();
+  document.querySelectorAll('.sc-item').forEach(item => {
+    if (!query) { item.classList.remove('hidden'); return; }
+    const name = item.dataset.name || '';
+    const desc = (item.querySelector('.sc-desc') || {}).textContent || '';
+    const match = name.includes(query) || desc.toLowerCase().includes(query);
+    item.classList.toggle('hidden', !match);
+  });
+  document.querySelectorAll('.cluster-group').forEach(g => {
+    const list = g.querySelector('.sc-list');
+    const arrow = g.querySelector('.arrow');
+    const clusterName = (g.querySelector('.cluster-name') || {}).textContent || '';
+    const hasVisible = g.querySelector('.sc-item:not(.hidden)');
+    const clusterMatch = query && clusterName.toLowerCase().includes(query);
+    if (clusterMatch) {
+      g.querySelectorAll('.sc-item').forEach(item => item.classList.remove('hidden'));
+    }
+    if (query && (hasVisible || clusterMatch)) {
+      list.classList.add('open'); arrow.classList.add('open');
+    } else if (query) {
+      list.classList.remove('open'); arrow.classList.remove('open');
+    }
+    if (!query) {
+      const hasChecked = g.querySelector('input:checked');
+      if (!hasChecked) { list.classList.remove('open'); arrow.classList.remove('open'); }
+    }
+  });
+}
+
+// --- Save ---
+function saveAndNext() {
+  const e = entries[filteredIdx[curIdx]];
+  const overrideSC = Array.from(selectedSCs).join(', ');
+  saveEntry(e, overrideSC, selectedFocus, selectedSpecificity, editedSummary);
+  next();
+}
+
+async function saveEntry(e, sc, focus, specificity, summary) {
+  // Prompt for reviewer name if not set
+  if (!reviewerName) {
+    reviewerName = prompt('Enter your name (for tracking who reviewed what):');
+    if (!reviewerName) return; // cancelled
+    localStorage.setItem('forrt_reviewer_name', reviewerName);
+  }
+
+  // Save locally
+  e.localOverride = sc;
+  e.localOverrideFocus = focus;
+  e.localOverrideSpecificity = specificity;
+  e.localOverrideSummary = summary;
+  e.reviewedBy = reviewerName;
+
+  const saved = JSON.parse(localStorage.getItem('forrt_overrides_v2') || '{}');
+  saved[e.sheetRow] = { sc, focus, specificity, summary };
+  localStorage.setItem('forrt_overrides_v2', JSON.stringify(saved));
+
+  const statusEl = document.getElementById('saveStatus');
+
+  if (writeProxyUrl) {
+    statusEl.innerHTML = '<span class="badge saving">saving...</span>';
+    const results = await Promise.all([
+      writeToSheet(e.sheetRow, COL.overrideSC, sc),
+      writeToSheet(e.sheetRow, COL.overrideFocus, focus),
+      writeToSheet(e.sheetRow, COL.overrideSpecificity, specificity),
+      writeToSheet(e.sheetRow, COL.overrideSummary, summary),
+      writeToSheet(e.sheetRow, COL.reviewedBy, reviewerName),
+    ]);
+    if (results.every(Boolean)) {
+      e.override = sc;
+      e.overrideFocus = focus;
+      e.overrideSpecificity = specificity;
+      e.overrideSummary = summary;
+      statusEl.innerHTML = '<span class="badge saved">saved to sheet &#10003;</span>';
+    } else {
+      statusEl.innerHTML = '<span class="badge saving">saved locally only</span>';
+    }
+  } else {
+    statusEl.innerHTML = '<span class="badge saved">saved locally &#10003;</span>';
+  }
+
+  updateStats();
+  applyFilter();
+  setTimeout(() => { statusEl.innerHTML = ''; }, 1500);
+}
+
+function updateStats() {
+  const reviewed = entries.filter(e => isReviewed(e)).length;
+  document.getElementById('statsText').textContent = `${reviewed} / ${entries.length} reviewed`;
+  const pct = entries.length ? (reviewed / entries.length * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+// --- Utilities ---
+function splitSC(s) { return (s || '').split(/;\s*|,\s*/).map(x => x.trim()).filter(Boolean); }
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function hashCode(s) { let h = 0; for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return Math.abs(h); }
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && e.target.type !== 'checkbox' && e.target.type !== 'radio') return;
+  if (e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+  else if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.sc-item')) { e.preventDefault(); saveAndNext(); }
+  else if (e.key === '/' && e.target.tagName !== 'INPUT') {
+    e.preventDefault();
+    const sb = document.getElementById('scSearch');
+    if (sb) sb.focus();
+  }
+});
+
+// Start
+renderSetupBanner();
+init();
+</script>
+</body>
+</html>
