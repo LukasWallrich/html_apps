@@ -185,6 +185,7 @@
 const SHEET_ID = '170CGZDYdT8K1czVwML_s0fdiv4lWc_N4O9p8OQZQ8vE';
 const REVIEW_GID = '1101357105';
 const REF_GID = '990226645';
+const CURATED_GID = '1924034107';
 
 const FOCUS_OPTIONS = ['overview', 'evidence', 'practice/tools', 'teaching/training', 'advocacy', 'critique', 'policies'];
 const SPECIFICITY_OPTIONS = ['Generalist', 'Discipline-specific', 'Narrow'];
@@ -242,7 +243,15 @@ async function loadCSV(gid) {
 
 async function init() {
   try {
-    const [refRows, reviewRows] = await Promise.all([loadCSV(REF_GID), loadCSV(REVIEW_GID)]);
+    const [refRows, reviewRows, curatedRows] = await Promise.all([
+      loadCSV(REF_GID), loadCSV(REVIEW_GID), loadCSV(CURATED_GID),
+    ]);
+
+    // Build URL lookup by source row (curated sheet column C = index 2)
+    const urlByRow = {};
+    for (let i = 1; i < curatedRows.length; i++) {
+      urlByRow[i + 1] = (curatedRows[i] && curatedRows[i][2]) || ''; // row i+1 (1-indexed + header)
+    }
 
     // Parse taxonomy
     for (let i = 1; i < refRows.length; i++) {
@@ -283,6 +292,7 @@ async function init() {
         overrideSpecificity: r[16] || '',
         overrideSummary: r[17] || '',
         reviewedBy: r[18] || '',
+        url: urlByRow[parseInt(r[0])] || '',
       });
     }
 
@@ -468,7 +478,7 @@ function render() {
   let html = `
     <div class="meta">
       ${e.reviewedBy ? `<span class="badge saved">reviewed by ${esc(e.reviewedBy)}</span>` : ''}
-      <span style="font-size:12px;color:var(--muted)">#${e.sourceRow}</span>
+      <span style="font-size:12px;color:var(--muted)">#${e.sourceRow}${e.url ? ` <a href="${esc(e.url)}" target="_blank" rel="noopener" title="Open resource" style="color:var(--accent);text-decoration:none;">&#x1F517;</a>` : ''}</span>
     </div>
     <h2>${esc(e.title)}</h2>
   `;
