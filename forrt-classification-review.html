@@ -603,7 +603,7 @@ function render() {
   // Auto-resize abstract if full mode
   if (fullAbstracts) {
     const ta = document.getElementById('abstractEdit');
-    if (ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
+    if (ta) { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 4) + 'px'; }
   }
 }
 
@@ -622,7 +622,7 @@ function toggleFullAbstracts() {
     if (fullAbstracts) {
       ta.style.height = 'auto';
       ta.style.minHeight = '3.6lh';
-      ta.style.height = ta.scrollHeight + 'px';
+      ta.style.height = (ta.scrollHeight + 4) + 'px';
     } else {
       ta.style.height = '3.6lh';
       ta.style.minHeight = '';
