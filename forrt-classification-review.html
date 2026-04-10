@@ -579,7 +579,7 @@ function render() {
                  ${checked ? 'checked' : ''} onchange="toggleSC(this)">
           <label for="${id}">
             ${esc(sc.name)}
-            <div class="sc-desc">${esc(sc.description ? sc.description.substring(0, 250) : '')}</div>
+            <div class="sc-desc">${esc(sc.description || '')}</div>
           </label>
         </div>
       `;
