@@ -163,7 +163,10 @@
       <button id="fUnreviewed" onclick="setFilter('unreviewed')">Unreviewed</button>
     </div>
     <div class="spacer"></div>
-    <button id="abstractToggle" onclick="toggleFullAbstracts()" title="Toggle full/short abstracts">Short abstracts</button>
+    <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--muted);">
+      <input type="checkbox" id="abstractToggle" onchange="toggleFullAbstracts()" style="width:14px;height:14px;cursor:pointer;">
+      Full abstracts
+    </label>
     <button class="primary" onclick="saveAndNext()" title="Save & next (Enter / Space)">Save &amp; Next</button>
     <button onclick="exportOverrides()" title="Download all overrides as CSV">&#8681; Export</button>
     <span id="saveStatus"></span>
@@ -613,8 +616,7 @@ function toggleSection(id, headerEl) {
 }
 
 function toggleFullAbstracts() {
-  fullAbstracts = !fullAbstracts;
-  document.getElementById('abstractToggle').textContent = fullAbstracts ? 'Full abstracts' : 'Short abstracts';
+  fullAbstracts = document.getElementById('abstractToggle').checked;
   const ta = document.getElementById('abstractEdit');
   if (ta) {
     if (fullAbstracts) {
