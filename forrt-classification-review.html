@@ -192,6 +192,7 @@ const SPECIFICITY_OPTIONS = ['Generalist', 'Discipline-specific', 'Narrow'];
 
 // Column indices for sheet writes (1-based)
 const COL = {
+  abstract: 3,          // C
   overrideSC: 12,       // L
   overrideFocus: 16,    // P
   overrideSpecificity: 17, // Q
@@ -207,6 +208,7 @@ let selectedSCs = new Set();
 let selectedFocus = '';
 let selectedSpecificity = '';
 let editedSummary = '';
+let editedAbstract = '';
 let filter = 'all';
 let writeProxyUrl = localStorage.getItem('forrt_write_proxy') || '';
 let reviewerName = localStorage.getItem('forrt_reviewer_name') || '';
@@ -305,6 +307,7 @@ async function init() {
         if (s.focus !== undefined) e.localOverrideFocus = s.focus;
         if (s.specificity !== undefined) e.localOverrideSpecificity = s.specificity;
         if (s.summary !== undefined) e.localOverrideSummary = s.summary;
+        if (s.abstract !== undefined) e.localAbstract = s.abstract;
       }
     }
 
@@ -474,6 +477,7 @@ function render() {
   selectedFocus = e.localOverrideFocus || e.overrideFocus || e.focus || '';
   selectedSpecificity = e.localOverrideSpecificity || e.overrideSpecificity || e.specificity || '';
   editedSummary = e.localOverrideSummary || e.overrideSummary || e.summary || '';
+  editedAbstract = e.localAbstract || e.abstract || '';
 
   let html = `
     <div class="meta">
@@ -483,14 +487,13 @@ function render() {
     <h2>${esc(e.title)}</h2>
   `;
 
-  if (e.abstract && e.abstract !== '(no abstract)') {
-    html += `
-      <div class="abstract-wrap" id="abstractBox">
-        <span class="abstract-text">${esc(e.abstract)}</span>
-        <button class="toggle-abstract" onclick="document.getElementById('abstractBox').classList.toggle('expanded');this.textContent=this.textContent==='show more'?'show less':'show more'">show more</button>
-      </div>
-    `;
-  }
+  html += `<div class="field-row" style="align-items:flex-start;">
+    <div class="section-label">Abstract</div>
+    <div style="flex:1">
+      <textarea class="summary-textarea" id="abstractEdit" style="height:3.6lh;"
+                oninput="editedAbstract=this.value">${esc(editedAbstract)}</textarea>
+    </div>
+  </div>`;
 
   // --- Focus (inline row) ---
   html += `<div class="field-row">
@@ -688,11 +691,11 @@ function filterSCs(query) {
 function saveAndNext() {
   const e = entries[filteredIdx[curIdx]];
   const overrideSC = Array.from(selectedSCs).join('; ');
-  saveEntry(e, overrideSC, selectedFocus, selectedSpecificity, editedSummary);
+  saveEntry(e, overrideSC, selectedFocus, selectedSpecificity, editedSummary, editedAbstract);
   next();
 }
 
-async function saveEntry(e, sc, focus, specificity, summary) {
+async function saveEntry(e, sc, focus, specificity, summary, abstract) {
   // Prompt for reviewer name if not set
   if (!reviewerName) {
     reviewerName = prompt('Enter your name (for tracking who reviewed what):');
@@ -705,23 +708,31 @@ async function saveEntry(e, sc, focus, specificity, summary) {
   e.localOverrideFocus = focus;
   e.localOverrideSpecificity = specificity;
   e.localOverrideSummary = summary;
+  e.localAbstract = abstract;
   e.reviewedBy = reviewerName;
 
   const saved = JSON.parse(localStorage.getItem('forrt_overrides_v2') || '{}');
-  saved[e.sourceRow] = { sc, focus, specificity, summary };
+  saved[e.sourceRow] = { sc, focus, specificity, summary, abstract };
   localStorage.setItem('forrt_overrides_v2', JSON.stringify(saved));
 
   const statusEl = document.getElementById('saveStatus');
 
+  // Only write abstract if it was actually changed
+  const abstractChanged = abstract !== e.abstract;
+
   if (writeProxyUrl) {
     statusEl.innerHTML = '<span class="badge saving">saving...</span>';
-    const results = await Promise.all([
+    const writes = [
       writeToSheet(e.sourceRow, COL.overrideSC, sc),
       writeToSheet(e.sourceRow, COL.overrideFocus, focus),
       writeToSheet(e.sourceRow, COL.overrideSpecificity, specificity),
       writeToSheet(e.sourceRow, COL.overrideSummary, summary),
       writeToSheet(e.sourceRow, COL.reviewedBy, reviewerName),
-    ]);
+    ];
+    if (abstractChanged) {
+      writes.push(writeToSheet(e.sourceRow, COL.abstract, abstract));
+    }
+    const results = await Promise.all(writes);
     if (results.every(Boolean)) {
       e.override = sc;
       e.overrideFocus = focus;
