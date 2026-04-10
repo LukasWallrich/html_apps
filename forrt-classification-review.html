@@ -300,19 +300,6 @@ async function init() {
       });
     }
 
-    // Load local overrides from localStorage
-    const saved = JSON.parse(localStorage.getItem('forrt_overrides_v3') || '{}');
-    for (const e of entries) {
-      const s = saved[e.sourceRow];
-      if (s) {
-        if (s.sc !== undefined) e.localOverride = s.sc;
-        if (s.focus !== undefined) e.localOverrideFocus = s.focus;
-        if (s.specificity !== undefined) e.localOverrideSpecificity = s.specificity;
-        if (s.summary !== undefined) e.localOverrideSummary = s.summary;
-        if (s.abstract !== undefined) e.localAbstract = s.abstract;
-      }
-    }
-
     applyFilter();
     render();
     updateStats();
@@ -402,19 +389,17 @@ async function testProxy() {
 
 // --- Export ---
 function exportOverrides() {
-  const saved = JSON.parse(localStorage.getItem('forrt_overrides_v3') || '{}');
-  const rows = [['Sheet_Row', 'Title', 'Original_Sub_Clusters', 'Override_Sub_Clusters',
+  const rows = [['Source_Row', 'Title', 'Original_Sub_Clusters', 'Override_Sub_Clusters',
                   'Original_Focus', 'Override_Focus', 'Original_Specificity', 'Override_Specificity',
                   'Original_Summary', 'Override_Summary']];
   for (const e of entries) {
-    const s = saved[e.sourceRow];
-    if (!s && !e.override && !e.overrideFocus && !e.overrideSpecificity && !e.overrideSummary) continue;
+    if (!e.override && !e.overrideFocus && !e.overrideSpecificity && !e.overrideSummary) continue;
     rows.push([
-      e.sheetRow, e.title,
-      e.subClusters, s?.sc || e.override || '',
-      e.focus, s?.focus || e.overrideFocus || '',
-      e.specificity, s?.specificity || e.overrideSpecificity || '',
-      e.summary, s?.summary || e.overrideSummary || '',
+      e.sourceRow, e.title,
+      e.subClusters, e.override || '',
+      e.focus, e.overrideFocus || '',
+      e.specificity, e.overrideSpecificity || '',
+      e.summary, e.overrideSummary || '',
     ]);
   }
   if (rows.length === 1) { alert('No overrides to export yet.'); return; }
@@ -472,14 +457,14 @@ function render() {
 
   const currentSCs = splitSC(e.subClusters);
   const altSCs = splitSC(e.llmAlt);
-  const overrideSCs = splitSC(e.localOverride || e.override);
+  const overrideSCs = splitSC(e.override);
 
   // Pre-select: local override > sheet override > current assignment
   selectedSCs = new Set(overrideSCs.length ? overrideSCs : currentSCs);
-  selectedFocus = e.localOverrideFocus || e.overrideFocus || e.focus || '';
-  selectedSpecificity = e.localOverrideSpecificity || e.overrideSpecificity || e.specificity || '';
-  editedSummary = e.localOverrideSummary || e.overrideSummary || e.summary || '';
-  editedAbstract = e.localAbstract || e.abstract || '';
+  selectedFocus = e.overrideFocus || e.focus || '';
+  selectedSpecificity = e.overrideSpecificity || e.specificity || '';
+  editedSummary = e.overrideSummary || e.summary || '';
+  editedAbstract = e.abstract || '';
 
   let html = `
     <div class="meta">
@@ -727,22 +712,15 @@ async function saveEntry(e, sc, focus, specificity, summary, abstract) {
     localStorage.setItem('forrt_reviewer_name', reviewerName);
   }
 
-  // Save locally
-  e.localOverride = sc;
-  e.localOverrideFocus = focus;
-  e.localOverrideSpecificity = specificity;
-  e.localOverrideSummary = summary;
-  e.localAbstract = abstract;
+  // Update in-memory entry
+  e.override = sc;
+  e.overrideFocus = focus;
+  e.overrideSpecificity = specificity;
+  e.overrideSummary = summary;
+  if (abstract !== e.abstract) e.abstract = abstract;
   e.reviewedBy = reviewerName;
 
-  const saved = JSON.parse(localStorage.getItem('forrt_overrides_v3') || '{}');
-  saved[e.sourceRow] = { sc, focus, specificity, summary, abstract };
-  localStorage.setItem('forrt_overrides_v3', JSON.stringify(saved));
-
   const statusEl = document.getElementById('saveStatus');
-
-  // Only write abstract if it was actually changed
-  const abstractChanged = abstract !== e.abstract;
 
   if (writeProxyUrl) {
     statusEl.innerHTML = '<span class="badge saving">saving...</span>';
@@ -752,10 +730,8 @@ async function saveEntry(e, sc, focus, specificity, summary, abstract) {
       writeToSheet(e.sourceRow, COL.overrideSpecificity, specificity),
       writeToSheet(e.sourceRow, COL.overrideSummary, summary),
       writeToSheet(e.sourceRow, COL.reviewedBy, reviewerName),
+      writeToSheet(e.sourceRow, COL.abstract, abstract),
     ];
-    if (abstractChanged) {
-      writes.push(writeToSheet(e.sourceRow, COL.abstract, abstract));
-    }
     const results = await Promise.all(writes);
     if (results.every(Boolean)) {
       e.override = sc;
@@ -764,10 +740,10 @@ async function saveEntry(e, sc, focus, specificity, summary, abstract) {
       e.overrideSummary = summary;
       statusEl.innerHTML = '<span class="badge saved">saved to sheet &#10003;</span>';
     } else {
-      statusEl.innerHTML = '<span class="badge saving">saved locally only</span>';
+      statusEl.innerHTML = '<span class="badge saving">sheet write failed</span>';
     }
   } else {
-    statusEl.innerHTML = '<span class="badge saved">saved locally &#10003;</span>';
+    statusEl.innerHTML = '<span class="badge saving">no proxy &mdash; not saved!</span>';
   }
 
   updateStats();
