@@ -480,7 +480,7 @@ function render() {
   html += `<div class="field-row" style="align-items:flex-start;">
     <div class="section-label">Abstract</div>
     <div style="flex:1">
-      <textarea class="summary-textarea" id="abstractEdit" style="height:${fullAbstracts ? 'auto' : '3.6lh'};${fullAbstracts ? 'min-height:3.6lh;' : ''}"
+      <textarea class="summary-textarea" id="abstractEdit" spellcheck="false" style="height:${fullAbstracts ? 'auto' : '3.6lh'};${fullAbstracts ? 'min-height:3.6lh;' : ''}"
                 oninput="editedAbstract=this.value">${esc(editedAbstract)}</textarea>
     </div>
   </div>`;
