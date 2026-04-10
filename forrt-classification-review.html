@@ -163,6 +163,7 @@
       <button id="fUnreviewed" onclick="setFilter('unreviewed')">Unreviewed</button>
     </div>
     <div class="spacer"></div>
+    <button id="abstractToggle" onclick="toggleFullAbstracts()" title="Toggle full/short abstracts">Short abstracts</button>
     <button class="primary" onclick="saveAndNext()" title="Save & next (Enter / Space)">Save &amp; Next</button>
     <button onclick="exportOverrides()" title="Download all overrides as CSV">&#8681; Export</button>
     <span id="saveStatus"></span>
@@ -209,6 +210,7 @@ let selectedFocus = '';
 let selectedSpecificity = '';
 let editedSummary = '';
 let editedAbstract = '';
+let fullAbstracts = false;
 let filter = 'all';
 let writeProxyUrl = localStorage.getItem('forrt_write_proxy') || '';
 let reviewerName = localStorage.getItem('forrt_reviewer_name') || '';
@@ -490,7 +492,7 @@ function render() {
   html += `<div class="field-row" style="align-items:flex-start;">
     <div class="section-label">Abstract</div>
     <div style="flex:1">
-      <textarea class="summary-textarea" id="abstractEdit" style="height:3.6lh;"
+      <textarea class="summary-textarea" id="abstractEdit" style="height:${fullAbstracts ? 'auto' : '3.6lh'};${fullAbstracts ? 'min-height:3.6lh;' : ''}"
                 oninput="editedAbstract=this.value">${esc(editedAbstract)}</textarea>
     </div>
   </div>`;
@@ -609,6 +611,12 @@ function render() {
   html += '</div></div>'; // end collapsible-body, selector
 
   card.innerHTML = html;
+
+  // Auto-resize abstract if full mode
+  if (fullAbstracts) {
+    const ta = document.getElementById('abstractEdit');
+    if (ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
+  }
 }
 
 function toggleSection(id, headerEl) {
@@ -617,6 +625,22 @@ function toggleSection(id, headerEl) {
   body.classList.toggle('collapsed');
   body.classList.toggle('expanded');
   arrow.classList.toggle('open');
+}
+
+function toggleFullAbstracts() {
+  fullAbstracts = !fullAbstracts;
+  document.getElementById('abstractToggle').textContent = fullAbstracts ? 'Full abstracts' : 'Short abstracts';
+  const ta = document.getElementById('abstractEdit');
+  if (ta) {
+    if (fullAbstracts) {
+      ta.style.height = 'auto';
+      ta.style.minHeight = '3.6lh';
+      ta.style.height = ta.scrollHeight + 'px';
+    } else {
+      ta.style.height = '3.6lh';
+      ta.style.minHeight = '';
+    }
+  }
 }
 
 function selectFocus(val) {
