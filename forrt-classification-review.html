@@ -299,7 +299,7 @@ async function init() {
     // Load local overrides from localStorage
     const saved = JSON.parse(localStorage.getItem('forrt_overrides_v2') || '{}');
     for (const e of entries) {
-      const s = saved[e.sheetRow];
+      const s = saved[e.sourceRow];
       if (s) {
         if (s.sc !== undefined) e.localOverride = s.sc;
         if (s.focus !== undefined) e.localOverrideFocus = s.focus;
@@ -319,13 +319,13 @@ async function init() {
 }
 
 // --- Write proxy ---
-async function writeToSheet(sheetRow, col, value) {
+async function writeToSheet(sourceRow, col, value) {
   if (!writeProxyUrl) return false;
   try {
     const resp = await fetch(writeProxyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ sheetRow, col, value }),
+      body: JSON.stringify({ sourceRow, col, value }),
       redirect: 'follow',
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -402,7 +402,7 @@ function exportOverrides() {
                   'Original_Focus', 'Override_Focus', 'Original_Specificity', 'Override_Specificity',
                   'Original_Summary', 'Override_Summary']];
   for (const e of entries) {
-    const s = saved[e.sheetRow];
+    const s = saved[e.sourceRow];
     if (!s && !e.override && !e.overrideFocus && !e.overrideSpecificity && !e.overrideSummary) continue;
     rows.push([
       e.sheetRow, e.title,
@@ -708,7 +708,7 @@ async function saveEntry(e, sc, focus, specificity, summary) {
   e.reviewedBy = reviewerName;
 
   const saved = JSON.parse(localStorage.getItem('forrt_overrides_v2') || '{}');
-  saved[e.sheetRow] = { sc, focus, specificity, summary };
+  saved[e.sourceRow] = { sc, focus, specificity, summary };
   localStorage.setItem('forrt_overrides_v2', JSON.stringify(saved));
 
   const statusEl = document.getElementById('saveStatus');
@@ -716,11 +716,11 @@ async function saveEntry(e, sc, focus, specificity, summary) {
   if (writeProxyUrl) {
     statusEl.innerHTML = '<span class="badge saving">saving...</span>';
     const results = await Promise.all([
-      writeToSheet(e.sheetRow, COL.overrideSC, sc),
-      writeToSheet(e.sheetRow, COL.overrideFocus, focus),
-      writeToSheet(e.sheetRow, COL.overrideSpecificity, specificity),
-      writeToSheet(e.sheetRow, COL.overrideSummary, summary),
-      writeToSheet(e.sheetRow, COL.reviewedBy, reviewerName),
+      writeToSheet(e.sourceRow, COL.overrideSC, sc),
+      writeToSheet(e.sourceRow, COL.overrideFocus, focus),
+      writeToSheet(e.sourceRow, COL.overrideSpecificity, specificity),
+      writeToSheet(e.sourceRow, COL.overrideSummary, summary),
+      writeToSheet(e.sourceRow, COL.reviewedBy, reviewerName),
     ]);
     if (results.every(Boolean)) {
       e.override = sc;
