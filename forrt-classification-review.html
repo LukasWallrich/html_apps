@@ -301,7 +301,7 @@ async function init() {
     }
 
     // Load local overrides from localStorage
-    const saved = JSON.parse(localStorage.getItem('forrt_overrides_v2') || '{}');
+    const saved = JSON.parse(localStorage.getItem('forrt_overrides_v3') || '{}');
     for (const e of entries) {
       const s = saved[e.sourceRow];
       if (s) {
@@ -402,7 +402,7 @@ async function testProxy() {
 
 // --- Export ---
 function exportOverrides() {
-  const saved = JSON.parse(localStorage.getItem('forrt_overrides_v2') || '{}');
+  const saved = JSON.parse(localStorage.getItem('forrt_overrides_v3') || '{}');
   const rows = [['Sheet_Row', 'Title', 'Original_Sub_Clusters', 'Override_Sub_Clusters',
                   'Original_Focus', 'Override_Focus', 'Original_Specificity', 'Override_Specificity',
                   'Original_Summary', 'Override_Summary']];
@@ -735,9 +735,9 @@ async function saveEntry(e, sc, focus, specificity, summary, abstract) {
   e.localAbstract = abstract;
   e.reviewedBy = reviewerName;
 
-  const saved = JSON.parse(localStorage.getItem('forrt_overrides_v2') || '{}');
+  const saved = JSON.parse(localStorage.getItem('forrt_overrides_v3') || '{}');
   saved[e.sourceRow] = { sc, focus, specificity, summary, abstract };
-  localStorage.setItem('forrt_overrides_v2', JSON.stringify(saved));
+  localStorage.setItem('forrt_overrides_v3', JSON.stringify(saved));
 
   const statusEl = document.getElementById('saveStatus');
 
