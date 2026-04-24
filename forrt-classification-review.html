@@ -343,13 +343,16 @@ function renderSetupBanner() {
     </div>`;
   } else {
     el.innerHTML = `<div class="setup-banner">
-      <strong>Sheet sync not configured</strong> &mdash; reviews save to your browser only.<br>
-      To save directly to the Google Sheet, deploy the
-      <a href="https://github.com/forrtproject/forrtproject.github.io/blob/master/scripts/review_app/WriteProxy.gs"
-         target="_blank">write proxy</a> and paste the URL below:
+      <strong>&#9888; Sheet sync not configured &mdash; your reviews will NOT be saved.</strong><br>
+      Reviews are only persisted when the write-proxy URL below is set. Nothing is stored in
+      your browser, so reloading or closing this tab will lose any work done without a proxy URL.<br>
+      Paste the write-proxy URL to connect:
       <input id="proxyUrlInput" type="text" placeholder="https://script.google.com/macros/s/.../exec"
              value="${esc(writeProxyUrl)}">
       <button onclick="saveProxyUrl()">Connect</button>
+      <div style="margin-top:8px;font-size:12px;color:var(--muted)">
+        Don't have the URL? Message <strong>Lukas Wallrich</strong> on Slack to get it.
+      </div>
     </div>`;
   }
 }
@@ -745,7 +748,7 @@ async function saveEntry(e, sc, focus, specificity, summary, abstract) {
       statusEl.innerHTML = '<span class="badge saving">sheet write failed</span>';
     }
   } else {
-    statusEl.innerHTML = '<span class="badge saving">no proxy &mdash; not saved!</span>';
+    statusEl.innerHTML = '<span class="badge saving">no proxy URL &mdash; not saved! Ask Lukas Wallrich on Slack</span>';
   }
 
   updateStats();
