@@ -224,6 +224,106 @@
         .searchable-hidden {
             display: none;
         }
+
+        /* Bibliometric progress details */
+        .biblio-details {
+            margin-top: 1.5rem;
+            background: white;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            font-size: 0.875rem;
+            color: #4a5568;
+        }
+
+        .biblio-details summary {
+            cursor: pointer;
+            font-weight: 500;
+            color: #718096;
+            list-style: none;
+        }
+
+        .biblio-details summary::-webkit-details-marker { display: none; }
+
+        .biblio-details summary::before {
+            content: "▶";
+            display: inline-block;
+            margin-right: 0.5rem;
+            font-size: 0.75rem;
+            transition: transform 0.2s ease;
+        }
+
+        .biblio-details[open] summary::before {
+            transform: rotate(90deg);
+        }
+
+        .biblio-body {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .biblio-bar {
+            position: relative;
+            height: 22px;
+            border-radius: 11px;
+            overflow: hidden;
+            margin: 1.25rem 0 0.5rem;
+            background:
+                linear-gradient(90deg, #edf2f7 0%, #edf2f7 80%, transparent 80%, transparent 100%),
+                repeating-linear-gradient(135deg, #f7fafc 0 6px, #edf2f7 6px 12px);
+        }
+
+        .biblio-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--flora-secondary), var(--flora-primary));
+            transition: width 0.4s ease;
+        }
+
+        .biblio-marker {
+            position: absolute;
+            top: -2px;
+            bottom: -2px;
+            width: 2px;
+            background: #2d3748;
+        }
+
+        .biblio-marker.stretch {
+            background: #cbd5e0;
+        }
+
+        .biblio-marker-label {
+            position: absolute;
+            top: -18px;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            color: #2d3748;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .biblio-marker.stretch .biblio-marker-label {
+            color: #a0aec0;
+            font-weight: 400;
+        }
+
+        .biblio-legend {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #718096;
+            margin-top: 0.25rem;
+        }
+
+        .biblio-legend .stretch-note {
+            color: #a0aec0;
+        }
+
+        .biblio-criteria {
+            margin: 0.5rem 0 0;
+            font-size: 0.8rem;
+            color: #718096;
+        }
     </style>
 </head>
 <body>
@@ -294,6 +394,23 @@
                 </table>
             </div>
         </div>
+
+        <details class="biblio-details" id="biblio-details" style="display: none;">
+            <summary>Progress towards bibliometric analysis</summary>
+            <div class="biblio-body">
+                <p class="biblio-criteria">
+                    Failed replications published 2011–2021 of original studies whose replications all failed.
+                </p>
+                <div class="biblio-bar">
+                    <div class="biblio-fill" id="biblio-fill" style="width: 0%;"></div>
+                    <div class="biblio-marker" id="biblio-marker-min"><span class="biblio-marker-label">goal 800</span></div>
+                </div>
+                <div class="biblio-legend">
+                    <span><strong id="biblio-count">0</strong> qualifying entries</span>
+                    <span class="stretch-note">stretch 1000</span>
+                </div>
+            </div>
+        </details>
 
         <div class="footer">
             Data source: <a href="https://github.com/forrtproject/FReD-data" target="_blank">FORRT FReD Project</a> |
@@ -466,6 +583,52 @@
             document.getElementById('stats-row').style.display = 'flex';
         }
 
+        function isFailedOutcome(outcome) {
+            const o = (outcome || '').toLowerCase().trim();
+            return o.includes('fail') || o === 'not replicated';
+        }
+
+        function updateBiblioProgress(data) {
+            const MIN = 800;
+            const TARGET = 1000;
+
+            // Group replications by original study DOI
+            const byOriginal = new Map();
+            data.forEach(row => {
+                const doiO = (row.doi_o || '').trim();
+                if (!doiO) return;
+                if (!byOriginal.has(doiO)) byOriginal.set(doiO, []);
+                byOriginal.get(doiO).push(row);
+            });
+
+            // Originals where every replication failed
+            const allFailedOriginals = new Set();
+            byOriginal.forEach((reps, doi) => {
+                if (reps.length === 0) return;
+                if (reps.every(r => isFailedOutcome(r.outcome))) {
+                    allFailedOriginals.add(doi);
+                }
+            });
+
+            // Count qualifying replication entries
+            let count = 0;
+            data.forEach(row => {
+                const year = parseInt(row.year_r, 10);
+                if (!Number.isFinite(year) || year < 2011 || year > 2021) return;
+                if (!isFailedOutcome(row.outcome)) return;
+                const doiO = (row.doi_o || '').trim();
+                if (!allFailedOriginals.has(doiO)) return;
+                count++;
+            });
+
+            const pct = Math.min(100, (count / TARGET) * 100);
+            const minPct = (MIN / TARGET) * 100;
+            document.getElementById('biblio-fill').style.width = pct + '%';
+            document.getElementById('biblio-marker-min').style.left = minPct + '%';
+            document.getElementById('biblio-count').textContent = count.toLocaleString();
+            document.getElementById('biblio-details').style.display = 'block';
+        }
+
         // Create searchable text from all relevant fields
         function createSearchableText(row) {
             const fields = [
@@ -496,6 +659,7 @@
                     });
                     fullRowData = data; // Store for detail view
                     updateStats(data);
+                    updateBiblioProgress(data);
 
                     const tableData = data.map((row, index) => [
                         null, // Details control column
