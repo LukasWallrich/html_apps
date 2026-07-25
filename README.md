@@ -29,6 +29,12 @@ A collection of vibe-coded HTML apps for personal use.
 
 ---
 
+### 📸 Doc Snap
+- **Link**: [doc-scanner.html](./doc-scanner.html)
+- **Description**: Webcam document scanner. Live preview highlights the detected page, then capture crops and perspective-corrects it to a straight rectangle. Detection is edge/line based (Sobel → Hough → quads scored by how much of their perimeter sits on real edges), so a hand holding the page doesn't get cropped in. Corners are draggable before cropping, auto-crop can be switched off entirely, and results download as `scan_YYYY-MM-DD_HH-MM-SS.png`. All processing happens locally — no uploads.
+
+---
+
 ## Deployment
 
 These apps are deployed via GitHub Pages. Visit the live site at: https://lukaswallrich.github.io/html_apps/

@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Doc Snap — webcam document scanner</title>
+<style>
+  :root{
+    --bg:#0e1116;
+    --panel:#161b24;
+    --line:#252c39;
+    --text:#e7ecf3;
+    --muted:#8d99ad;
+    --accent:#5ad1a6;
+    --accent-dim:#2f7d63;
+    --radius:14px;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f4f6f9; --panel:#ffffff; --line:#e2e7ee;
+      --text:#141922; --muted:#5f6b7d; --accent:#128a68; --accent-dim:#a9e3d0;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:15px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+    padding:22px 16px 36px; gap:16px;
+  }
+  header{text-align:center}
+  h1{margin:0; font-size:20px; letter-spacing:-.01em; font-weight:650}
+  h1 span{color:var(--accent)}
+  header p{margin:4px 0 0; color:var(--muted); font-size:13px}
+
+  .stage{
+    position:relative; width:min(880px,100%); aspect-ratio:4/3;
+    background:#000; border:1px solid var(--line); border-radius:var(--radius);
+    overflow:hidden; display:grid; place-items:center;
+  }
+  .stage video, .stage canvas{
+    position:absolute; inset:0; width:100%; height:100%;
+    object-fit:contain; background:#000;
+  }
+  canvas#overlay, canvas#editor{background:transparent}
+  canvas#overlay{pointer-events:none}
+  canvas#editor{touch-action:none; cursor:grab}
+  canvas#editor.dragging{cursor:grabbing}
+  .hidden{display:none !important}
+  .msg{color:var(--muted); font-size:14px; padding:24px; text-align:center; max-width:44ch; white-space:pre-wrap}
+
+  .badge{
+    position:absolute; left:12px; top:12px; z-index:3;
+    background:rgba(0,0,0,.55); backdrop-filter:blur(6px);
+    color:#fff; font-size:12px; font-weight:550; letter-spacing:.02em;
+    padding:5px 10px; border-radius:999px; display:flex; align-items:center; gap:7px;
+  }
+  .dot{width:7px;height:7px;border-radius:50%;background:#e05b5b;transition:background .2s}
+  .dot.on{background:var(--accent); box-shadow:0 0 0 3px rgba(90,209,166,.22)}
+
+  .controls{display:flex; gap:10px; flex-wrap:wrap; justify-content:center; align-items:center}
+  button{
+    font:inherit; font-weight:550; color:var(--text);
+    background:var(--panel); border:1px solid var(--line);
+    padding:10px 18px; border-radius:10px; cursor:pointer;
+    transition:transform .06s ease, border-color .15s, filter .15s;
+  }
+  button:hover{border-color:var(--accent-dim)}
+  button:active{transform:translateY(1px)}
+  button:disabled{opacity:.45; cursor:not-allowed}
+  button.primary{background:var(--accent); border-color:var(--accent); color:#07120e; padding:10px 26px}
+  button.primary:hover{filter:brightness(1.06)}
+
+  .toggle{
+    display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;
+    background:var(--panel); border:1px solid var(--line);
+    padding:9px 14px 9px 12px; border-radius:10px; font-size:14px;
+  }
+  .toggle input{position:absolute; opacity:0; pointer-events:none}
+  .track{width:36px;height:20px;border-radius:999px;background:var(--line);position:relative;transition:background .18s}
+  .track::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;
+    background:#fff;transition:transform .18s;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+  .toggle input:checked + .track{background:var(--accent)}
+  .toggle input:checked + .track::after{transform:translateX(16px)}
+
+  .hint{color:var(--muted); font-size:13px; text-align:center; min-height:20px}
+  footer{color:var(--muted); font-size:12px; text-align:center; max-width:62ch}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Doc <span>Snap</span></h1>
+  <p>Point your webcam at a document, snap, and it crops &amp; straightens itself.</p>
+</header>
+
+<div class="stage" id="stage">
+  <div class="badge" id="badge"><span class="dot" id="dot"></span><span id="badgeText">Starting camera…</span></div>
+  <video id="video" playsinline muted autoplay></video>
+  <canvas id="overlay"></canvas>
+  <canvas id="editor" class="hidden"></canvas>
+  <canvas id="shot" class="hidden"></canvas>
+  <div class="msg hidden" id="msg"></div>
+</div>
+
+<div class="hint" id="hint"></div>
+
+<div class="controls" id="liveControls">
+  <label class="toggle">
+    <input type="checkbox" id="autoCrop" checked>
+    <span class="track"></span>
+    Auto-crop document
+  </label>
+  <button class="primary" id="capture" disabled>Capture</button>
+  <button id="switch" class="hidden">Switch camera</button>
+</div>
+
+<div class="controls hidden" id="adjustControls">
+  <button id="retake1">Retake</button>
+  <button id="skipCrop">Keep full frame</button>
+  <button class="primary" id="doCrop">Crop &amp; straighten</button>
+</div>
+
+<div class="controls hidden" id="shotControls">
+  <button id="back">Back</button>
+  <button id="retake2">New scan</button>
+  <button class="primary" id="download">Download PNG</button>
+</div>
+
+<footer>Everything runs locally in your browser — no image ever leaves this device.</footer>
+
+<script>
+(() => {
+"use strict";
+
+/* ══════════════════ document detection ══════════════════
+   Edge/line based: blur → Sobel → non-max-suppressed edge map → gradient-guided
+   Hough transform → candidate quads from pairs of near-parallel lines, scored by
+   how much of the quad's perimeter actually sits on detected edges. Brightness
+   segmentation alone fails badly when something bright (a hand) touches the page.
+*/
+
+function toGray(imgData){
+  const { width:w, height:h, data } = imgData;
+  const g = new Float32Array(w*h);
+  for (let i=0, p=0; i<data.length; i+=4, p++)
+    g[p] = data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114;
+  return g;
+}
+
+// Separable 5-tap Gaussian.
+function blur5(src, w, h){
+  const k = [1,4,6,4,1], ks = 16;
+  const tmp = new Float32Array(w*h), out = new Float32Array(w*h);
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+    let s=0;
+    for (let i=-2;i<=2;i++){
+      const xx = Math.min(w-1, Math.max(0, x+i));
+      s += src[y*w+xx]*k[i+2];
+    }
+    tmp[y*w+x] = s/ks;
+  }
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+    let s=0;
+    for (let i=-2;i<=2;i++){
+      const yy = Math.min(h-1, Math.max(0, y+i));
+      s += tmp[yy*w+x]*k[i+2];
+    }
+    out[y*w+x] = s/ks;
+  }
+  return out;
+}
+
+// Sobel + non-maximum suppression + percentile threshold.
+function edgeMap(gray, w, h){
+  const g = blur5(gray, w, h);
+  const gx = new Float32Array(w*h), gy = new Float32Array(w*h), mag = new Float32Array(w*h);
+  let maxMag = 0;
+  for (let y=1;y<h-1;y++) for (let x=1;x<w-1;x++){
+    const i = y*w+x;
+    const a=g[i-w-1], b=g[i-w], c=g[i-w+1],
+          d=g[i-1],              f=g[i+1],
+          p=g[i+w-1], q=g[i+w], r=g[i+w+1];
+    const sx = (c+2*f+r) - (a+2*d+p);
+    const sy = (p+2*q+r) - (a+2*b+c);
+    gx[i]=sx; gy[i]=sy;
+    const m = Math.hypot(sx,sy);
+    mag[i]=m; if (m>maxMag) maxMag=m;
+  }
+  if (maxMag < 1e-6) return null;
+
+  // threshold at the 88th percentile of gradient magnitude (floored well above noise)
+  const hist = new Uint32Array(256);
+  for (let i=0;i<w*h;i++) hist[Math.min(255, (mag[i]/maxMag*255)|0)]++;
+  let cum = 0, cut = 255;
+  const target = w*h*0.88;
+  for (let i=0;i<256;i++){ cum += hist[i]; if (cum >= target){ cut = i; break; } }
+  const thr = Math.max(cut/255*maxMag, 0.08*maxMag);
+
+  const edge = new Uint8Array(w*h);
+  for (let y=1;y<h-1;y++) for (let x=1;x<w-1;x++){
+    const i = y*w+x, m = mag[i];
+    if (m < thr) continue;
+    // suppress along the gradient direction
+    const ang = Math.atan2(gy[i], gx[i]);
+    let d = Math.round(ang/(Math.PI/4)); d = ((d%4)+4)%4;
+    const off = [[1,0],[1,1],[0,1],[-1,1]][d];
+    const i1 = i + off[1]*w + off[0], i2 = i - off[1]*w - off[0];
+    if (m >= mag[i1] && m >= mag[i2]) edge[i] = 1;
+  }
+  return { edge, mag, gx, gy, maxMag };
+}
+
+const TH = 180;                        // theta bins, 1° each
+
+// Gradient-guided Hough: each edge pixel votes only near its own normal direction.
+function houghLines(em, w, h, maxLines){
+  const { edge, mag, gx, gy } = em;
+  const RH = Math.ceil(Math.hypot(w,h));
+  const RN = 2*RH+1;
+  const acc = new Float32Array(TH*RN);
+  const cos = new Float32Array(TH), sin = new Float32Array(TH);
+  for (let t=0;t<TH;t++){ const a = t*Math.PI/TH; cos[t]=Math.cos(a); sin[t]=Math.sin(a); }
+
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+    const i = y*w+x;
+    if (!edge[i]) continue;
+    let ang = Math.atan2(gy[i], gx[i]);
+    if (ang < 0) ang += Math.PI;
+    const t0 = Math.round(ang/Math.PI*TH) % TH;
+    const wgt = mag[i];
+    for (let dt=-6; dt<=6; dt++){
+      const t = (t0+dt+TH)%TH;
+      const ri = Math.round(x*cos[t] + y*sin[t]) + RH;
+      if (ri>=0 && ri<RN) acc[t*RN+ri] += wgt;
+    }
+  }
+
+  // local maxima
+  const peaks = [];
+  for (let t=0;t<TH;t++) for (let r=1;r<RN-1;r++){
+    const v = acc[t*RN+r];
+    if (v <= 0) continue;
+    const tm = (t-1+TH)%TH, tp = (t+1)%TH;
+    if (v < acc[t*RN+r-1] || v < acc[t*RN+r+1]) continue;
+    if (v < acc[tm*RN+r] || v < acc[tp*RN+r]) continue;
+    peaks.push({ t, r, v });
+  }
+  peaks.sort((a,b)=> b.v - a.v);
+
+  const out = [];
+  for (const p of peaks){
+    if (out.length >= maxLines) break;
+    if (p.v < peaks[0].v*0.12) break;
+    let clash = false;
+    for (const o of out){
+      let dt = Math.abs(p.t - o.t); dt = Math.min(dt, TH-dt);
+      // theta near 0 and near 180 describe the same orientation with opposite rho sign
+      const sameSide = Math.abs(p.t - o.t) <= TH/2;
+      const dr = sameSide ? Math.abs(p.r - o.r) : Math.abs(p.r + o.r - 2*RH);
+      if (dt <= 8 && dr <= Math.max(8, Math.min(w,h)*0.06)){ clash = true; break; }
+    }
+    if (clash) continue;
+    const th = p.t*Math.PI/TH;
+    out.push({ nx: Math.cos(th), ny: Math.sin(th), rho: p.r - RH, t: p.t, strength: p.v, border:false });
+  }
+  return out;
+}
+
+const lineAngleDiff = (a,b) => {
+  let d = Math.abs(a.t - b.t) * 180/TH;
+  return Math.min(d, 180-d);
+};
+
+function intersect(a,b){
+  const det = a.nx*b.ny - a.ny*b.nx;
+  if (Math.abs(det) < 1e-9) return null;
+  return {
+    x: (a.rho*b.ny - b.rho*a.ny)/det,
+    y: (a.nx*b.rho - b.nx*a.rho)/det
+  };
+}
+
+const polyArea = q => {
+  let a = 0;
+  for (let i=0;i<q.length;i++){
+    const p = q[i], n = q[(i+1)%q.length];
+    a += p.x*n.y - n.x*p.y;
+  }
+  return Math.abs(a)/2;
+};
+
+function orderCorners(q){
+  const cx = q.reduce((s,p)=>s+p.x,0)/4, cy = q.reduce((s,p)=>s+p.y,0)/4;
+  const sorted = q.slice().sort((a,b)=> Math.atan2(a.y-cy,a.x-cx) - Math.atan2(b.y-cy,b.x-cx));
+  let start = 0, best = Infinity;
+  sorted.forEach((p,i)=>{ if (p.x+p.y < best){ best = p.x+p.y; start = i; } });
+  return [0,1,2,3].map(i => sorted[(start+i)%4]);
+}
+
+function quadValid(q, w, h){
+  const mx = 0.18;   // corners may sit a little outside the frame
+  for (const p of q)
+    if (p.x < -mx*w || p.x > (1+mx)*w || p.y < -mx*h || p.y > (1+mx)*h) return false;
+
+  const area = polyArea(q);
+  if (area < 0.10*w*h || area > 1.35*w*h) return false;
+
+  // convex, with corner angles in a plausible range
+  let sign = 0;
+  for (let i=0;i<4;i++){
+    const a = q[i], b = q[(i+1)%4], c = q[(i+2)%4];
+    const cr = (b.x-a.x)*(c.y-b.y) - (b.y-a.y)*(c.x-b.x);
+    if (cr === 0) return false;
+    const s = Math.sign(cr);
+    if (sign === 0) sign = s; else if (s !== sign) return false;
+    const v1 = { x:a.x-b.x, y:a.y-b.y }, v2 = { x:c.x-b.x, y:c.y-b.y };
+    const cosA = (v1.x*v2.x + v1.y*v2.y) / (Math.hypot(v1.x,v1.y)*Math.hypot(v2.x,v2.y) || 1);
+    if (Math.abs(cosA) > 0.72) return false;         // ~<44° or >136°
+  }
+
+  const d = (a,b)=> Math.hypot(a.x-b.x, a.y-b.y);
+  const s = [d(q[0],q[1]), d(q[1],q[2]), d(q[2],q[3]), d(q[3],q[0])];
+  if (Math.min(...s) < 0.18*Math.min(w,h)) return false;
+  if (Math.max(s[0],s[2])/Math.min(s[0],s[2]) > 2.6) return false;
+  if (Math.max(s[1],s[3])/Math.min(s[1],s[3]) > 2.6) return false;
+  return true;
+}
+
+// Fraction of the quad's perimeter that lies on detected edge pixels.
+// Sides that run along the image border get a neutral score — documents are
+// often cut off by the frame and have no visible edge there.
+function edgeSupport(q, edge, w, h, borderFlags){
+  let hit = 0, tot = 0;
+  for (let i=0;i<4;i++){
+    const a = q[i], b = q[(i+1)%4];
+    const len = Math.hypot(b.x-a.x, b.y-a.y);
+    const n = Math.max(10, Math.round(len/2));
+    if (borderFlags && borderFlags[i]){ hit += n*0.45; tot += n; continue; }
+    for (let k=0;k<n;k++){
+      const t = (k+0.5)/n;
+      const x = Math.round(a.x + (b.x-a.x)*t), y = Math.round(a.y + (b.y-a.y)*t);
+      tot++;
+      if (x<0||y<0||x>=w||y>=h) continue;           // outside frame: counts as a miss
+      let found = false;
+      for (let dy=-2; dy<=2 && !found; dy++) for (let dx=-2; dx<=2; dx++){
+        const xx=x+dx, yy=y+dy;
+        if (xx<0||yy<0||xx>=w||yy>=h) continue;
+        if (edge[yy*w+xx]){ found = true; break; }
+      }
+      if (found) hit++;
+    }
+  }
+  return tot ? hit/tot : 0;
+}
+
+// Which quad sides run along the image border (within a few px).
+function borderSides(q, w, h){
+  const tol = Math.max(3, Math.min(w,h)*0.02);
+  const onBorder = p => p.x<tol || p.y<tol || p.x>w-1-tol || p.y>h-1-tol;
+  const flags = [];
+  for (let i=0;i<4;i++){
+    const a=q[i], b=q[(i+1)%4];
+    flags.push(
+      onBorder(a) && onBorder(b) &&
+      (
+        (a.x<tol && b.x<tol) || (a.y<tol && b.y<tol) ||
+        (a.x>w-1-tol && b.x>w-1-tol) || (a.y>h-1-tol && b.y>h-1-tol)
+      )
+    );
+  }
+  return flags;
+}
+
+function detect(imgData){
+  const w = imgData.width, h = imgData.height;
+  const em = edgeMap(toGray(imgData), w, h);
+  if (!em) return null;
+
+  const lines = houghLines(em, w, h, 14);
+  // the frame borders themselves are legitimate document edges when a page is cut off
+  const eps = 0.5;
+  lines.push({ nx:1, ny:0, rho:eps,     t:0,    strength:0, border:true });
+  lines.push({ nx:1, ny:0, rho:w-1-eps, t:0,    strength:0, border:true });
+  lines.push({ nx:0, ny:1, rho:eps,     t:TH/2, strength:0, border:true });
+  lines.push({ nx:0, ny:1, rho:h-1-eps, t:TH/2, strength:0, border:true });
+
+  // pairs of near-parallel lines
+  const pairs = [];
+  for (let i=0;i<lines.length;i++) for (let j=i+1;j<lines.length;j++){
+    if (lineAngleDiff(lines[i], lines[j]) > 22) continue;
+    pairs.push([lines[i], lines[j]]);
+  }
+
+  let best = null;
+  for (let a=0;a<pairs.length;a++){
+    for (let b=a+1;b<pairs.length;b++){
+      const A = pairs[a], B = pairs[b];
+      const cross = lineAngleDiff(A[0], B[0]);
+      if (cross < 55) continue;                       // the two pairs must be roughly perpendicular
+      const c1 = intersect(A[0],B[0]), c2 = intersect(A[0],B[1]),
+            c3 = intersect(A[1],B[1]), c4 = intersect(A[1],B[0]);
+      if (!c1||!c2||!c3||!c4) continue;
+      const q = orderCorners([c1,c2,c3,c4]);
+      if (!quadValid(q, w, h)) continue;
+
+      const flags = borderSides(q, w, h);
+      if (flags.filter(Boolean).length > 2) continue; // don't just return the whole frame
+      const sup = edgeSupport(q, em.edge, w, h, flags);
+      if (sup < 0.55) continue;
+      const areaFrac = Math.min(polyArea(q)/(w*h), 1);
+      const score = sup * (0.55 + 0.45*areaFrac);
+      if (!best || score > best.score) best = { quad:q, score, sup };
+    }
+  }
+  return best ? best.quad : null;
+}
+
+/* ══════════════════ perspective warp ══════════════════ */
+
+// Homography mapping rect coords → quad coords.
+function homography(dst, src){
+  const A = [], b = [];
+  for (let i=0;i<4;i++){
+    const {x,y} = dst[i], {x:u,y:v} = src[i];
+    A.push([x,y,1,0,0,0,-x*u,-y*u]); b.push(u);
+    A.push([0,0,0,x,y,1,-x*v,-y*v]); b.push(v);
+  }
+  for (let c=0;c<8;c++){
+    let piv = c;
+    for (let r=c+1;r<8;r++) if (Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r;
+    [A[c],A[piv]] = [A[piv],A[c]]; [b[c],b[piv]] = [b[piv],b[c]];
+    const d = A[c][c];
+    if (Math.abs(d) < 1e-12) return null;
+    for (let k=c;k<8;k++) A[c][k] /= d;
+    b[c] /= d;
+    for (let r=0;r<8;r++){
+      if (r===c) continue;
+      const f = A[r][c];
+      if (!f) continue;
+      for (let k=c;k<8;k++) A[r][k] -= f*A[c][k];
+      b[r] -= f*b[c];
+    }
+  }
+  return b;
+}
+
+function warp(srcCanvas, quad){
+  const d = (a,b)=> Math.hypot(a.x-b.x, a.y-b.y);
+  let W = Math.round(Math.max(d(quad[0],quad[1]), d(quad[3],quad[2])));
+  let H = Math.round(Math.max(d(quad[0],quad[3]), d(quad[1],quad[2])));
+  W = Math.max(64, W); H = Math.max(64, H);
+
+  const Hm = homography([{x:0,y:0},{x:W,y:0},{x:W,y:H},{x:0,y:H}], quad);
+  if (!Hm) return null;
+  const [a,b_,c,dd,e,f,g,hh] = Hm;
+
+  const sctx = srcCanvas.getContext('2d', { willReadFrequently: true });
+  const src = sctx.getImageData(0,0,srcCanvas.width, srcCanvas.height);
+  const sw = src.width, sh = src.height, sd = src.data;
+
+  const out = new ImageData(W,H), od = out.data;
+  for (let y=0;y<H;y++) for (let x=0;x<W;x++){
+    const den = g*x + hh*y + 1;
+    const ux = (a*x + b_*y + c)/den, uy = (dd*x + e*y + f)/den;
+    const o = (y*W + x)*4;
+    od[o+3] = 255;
+    if (ux < 0 || uy < 0 || ux > sw-1 || uy > sh-1) continue;
+    const x0 = ux|0, y0 = uy|0;
+    const x1 = Math.min(x0+1, sw-1), y1 = Math.min(y0+1, sh-1);
+    const fx = ux-x0, fy = uy-y0;
+    for (let ch=0; ch<3; ch++){
+      const p00 = sd[(y0*sw+x0)*4+ch], p10 = sd[(y0*sw+x1)*4+ch];
+      const p01 = sd[(y1*sw+x0)*4+ch], p11 = sd[(y1*sw+x1)*4+ch];
+      od[o+ch] = (p00*(1-fx)*(1-fy) + p10*fx*(1-fy) + p01*(1-fx)*fy + p11*fx*fy) | 0;
+    }
+  }
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  cv.getContext('2d').putImageData(out, 0, 0);
+  return cv;
+}
+
+/* ══════════════════ app ══════════════════ */
+
+const $ = id => document.getElementById(id);
+const video = $('video'), overlay = $('overlay'), editor = $('editor'), shot = $('shot');
+const msg = $('msg'), dot = $('dot'), badge = $('badge'), badgeText = $('badgeText'), hint = $('hint');
+const autoCropEl = $('autoCrop');
+const liveControls = $('liveControls'), adjustControls = $('adjustControls'), shotControls = $('shotControls');
+
+let stream = null, devices = [], deviceIdx = 0, rafId = null;
+let liveQuad = null;                 // detected quad in video pixel coords
+let frameCanvas = null;              // captured full-resolution frame
+let adjQuad = null;                  // editable corners, frame coords
+let resultCanvas = null;
+let mode = 'live';                   // live | adjust | result
+
+const work = document.createElement('canvas');
+const wctx = work.getContext('2d', { willReadFrequently: true });
+
+function detectOn(source, sw, sh, targetWidth){
+  const dw = targetWidth, dh = Math.max(1, Math.round(dw*sh/sw));
+  work.width = dw; work.height = dh;
+  wctx.drawImage(source, 0, 0, dw, dh);
+  let q = null;
+  try { q = detect(wctx.getImageData(0,0,dw,dh)); } catch { q = null; }
+  return q ? q.map(p => ({ x: p.x*sw/dw, y: p.y*sh/dh })) : null;
+}
+
+/* ── camera ── */
+
+async function listCameras(){
+  try {
+    const all = await navigator.mediaDevices.enumerateDevices();
+    devices = all.filter(d => d.kind === 'videoinput');
+    $('switch').classList.toggle('hidden', devices.length < 2);
+  } catch {}
+}
+
+async function start(deviceId){
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = await navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: deviceId
+      ? { deviceId:{ exact: deviceId }, width:{ideal:1920}, height:{ideal:1080} }
+      : { facingMode:{ ideal:'environment' }, width:{ideal:1920}, height:{ideal:1080} }
+  });
+  video.srcObject = stream;
+  await video.play();
+  await listCameras();
+  $('capture').disabled = false;
+}
+
+/* ── geometry between canvas pixels and image pixels (object-fit: contain) ── */
+
+function fitRect(canvas, iw, ih){
+  const cw = canvas.width, ch = canvas.height;
+  const scale = Math.min(cw/iw, ch/ih);
+  const w = iw*scale, h = ih*scale;
+  return { x:(cw-w)/2, y:(ch-h)/2, scale };
+}
+
+function sizeCanvas(cv){
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.round(cv.clientWidth*dpr), h = Math.round(cv.clientHeight*dpr);
+  if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
+}
+
+function drawQuad(ctx, pts, r, handles){
+  ctx.beginPath();
+  pts.forEach((p,i) => {
+    const x = r.x + p.x*r.scale, y = r.y + p.y*r.scale;
+    i ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+  });
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(90,209,166,.13)';
+  ctx.fill();
+  ctx.strokeStyle = '#5ad1a6';
+  ctx.lineWidth = 3*(window.devicePixelRatio||1);
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  if (!handles) return;
+  const rad = 9*(window.devicePixelRatio||1);
+  pts.forEach(p => {
+    const x = r.x + p.x*r.scale, y = r.y + p.y*r.scale;
+    ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2);
+    ctx.fillStyle = '#5ad1a6'; ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,rad*0.45,0,Math.PI*2);
+    ctx.fillStyle = '#07120e'; ctx.fill();
+  });
+}
+
+/* ── live preview loop ── */
+
+let lastDetect = 0;
+function loop(ts){
+  rafId = requestAnimationFrame(loop);
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw) return;
+  sizeCanvas(overlay);
+  const ctx = overlay.getContext('2d');
+  ctx.clearRect(0,0,overlay.width, overlay.height);
+
+  if (!autoCropEl.checked){
+    liveQuad = null;
+    setStatus(true, 'Full frame');
+    return;
+  }
+  if (ts - lastDetect > 260){
+    lastDetect = ts;
+    liveQuad = detectOn(video, vw, vh, 280);
+    setStatus(!!liveQuad, liveQuad ? 'Document detected' : 'Looking for a document…');
+  }
+  if (liveQuad) drawQuad(ctx, liveQuad, fitRect(overlay, vw, vh), true);
+}
+
+function setStatus(ok, text){
+  dot.classList.toggle('on', ok);
+  badgeText.textContent = text;
+}
+
+/* ── corner editing ── */
+
+let dragIdx = -1;
+
+function drawEditor(){
+  if (!frameCanvas) return;
+  sizeCanvas(editor);
+  const ctx = editor.getContext('2d');
+  ctx.clearRect(0,0,editor.width, editor.height);
+  const r = fitRect(editor, frameCanvas.width, frameCanvas.height);
+  ctx.drawImage(frameCanvas, r.x, r.y, frameCanvas.width*r.scale, frameCanvas.height*r.scale);
+  drawQuad(ctx, adjQuad, r, true);
+}
+
+function toImageCoords(ev){
+  const rect = editor.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const cx = (ev.clientX - rect.left)*dpr, cy = (ev.clientY - rect.top)*dpr;
+  const r = fitRect(editor, frameCanvas.width, frameCanvas.height);
+  return { x:(cx - r.x)/r.scale, y:(cy - r.y)/r.scale, r, cx, cy };
+}
+
+editor.addEventListener('pointerdown', ev => {
+  if (mode !== 'adjust') return;
+  const { r, cx, cy } = toImageCoords(ev);
+  let best = -1, bestD = Infinity;
+  adjQuad.forEach((p,i) => {
+    const d = Math.hypot(r.x + p.x*r.scale - cx, r.y + p.y*r.scale - cy);
+    if (d < bestD){ bestD = d; best = i; }
+  });
+  if (bestD <= 30*(window.devicePixelRatio||1)){
+    dragIdx = best;
+    editor.classList.add('dragging');
+    editor.setPointerCapture(ev.pointerId);
+  }
+});
+editor.addEventListener('pointermove', ev => {
+  if (dragIdx < 0) return;
+  const { x, y } = toImageCoords(ev);
+  adjQuad[dragIdx] = {
+    x: Math.min(frameCanvas.width, Math.max(0, x)),
+    y: Math.min(frameCanvas.height, Math.max(0, y))
+  };
+  drawEditor();
+});
+const endDrag = () => { dragIdx = -1; editor.classList.remove('dragging'); };
+editor.addEventListener('pointerup', endDrag);
+editor.addEventListener('pointercancel', endDrag);
+window.addEventListener('resize', () => { if (mode === 'adjust') drawEditor(); });
+
+/* ── state transitions ── */
+
+function show(which){
+  mode = which;
+  video.classList.toggle('hidden', which !== 'live');
+  overlay.classList.toggle('hidden', which !== 'live');
+  badge.classList.toggle('hidden', which !== 'live');
+  editor.classList.toggle('hidden', which !== 'adjust');
+  shot.classList.toggle('hidden', which !== 'result');
+  liveControls.classList.toggle('hidden', which !== 'live');
+  adjustControls.classList.toggle('hidden', which !== 'adjust');
+  shotControls.classList.toggle('hidden', which !== 'result');
+  hint.textContent = which === 'adjust'
+    ? 'Drag the four corners onto the document, then crop.'
+    : which === 'result' ? '' : '';
+}
+
+function capture(){
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw) return;
+  frameCanvas = document.createElement('canvas');
+  frameCanvas.width = vw; frameCanvas.height = vh;
+  frameCanvas.getContext('2d').drawImage(video, 0, 0);
+
+  cancelAnimationFrame(rafId); rafId = null;
+
+  if (!autoCropEl.checked){ showResult(frameCanvas); return; }
+
+  const q = detectOn(frameCanvas, vw, vh, 420) || liveQuad;
+  adjQuad = q ? q.map(p => ({ x:Math.min(vw,Math.max(0,p.x)), y:Math.min(vh,Math.max(0,p.y)) }))
+              : [ {x:vw*0.1,y:vh*0.1}, {x:vw*0.9,y:vh*0.1}, {x:vw*0.9,y:vh*0.9}, {x:vw*0.1,y:vh*0.9} ];
+  show('adjust');
+  drawEditor();
+  hint.textContent = q
+    ? 'Drag the four corners onto the document, then crop.'
+    : 'No document found — drag the corners onto it, then crop.';
+}
+
+function showResult(canvas){
+  resultCanvas = canvas;
+  shot.width = canvas.width; shot.height = canvas.height;
+  shot.getContext('2d').drawImage(canvas, 0, 0);
+  show('result');
+}
+
+function doCrop(){
+  const out = warp(frameCanvas, adjQuad);
+  showResult(out || frameCanvas);
+}
+
+function retake(){
+  frameCanvas = null; resultCanvas = null; adjQuad = null;
+  show('live');
+  if (!rafId) rafId = requestAnimationFrame(loop);
+}
+
+function stamp(){
+  const d = new Date(), p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
+}
+
+function download(){
+  if (!resultCanvas) return;
+  resultCanvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `scan_${stamp()}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, 'image/png');
+}
+
+/* ── wiring ── */
+
+$('capture').addEventListener('click', capture);
+$('retake1').addEventListener('click', retake);
+$('retake2').addEventListener('click', retake);
+$('skipCrop').addEventListener('click', () => showResult(frameCanvas));
+$('doCrop').addEventListener('click', doCrop);
+$('download').addEventListener('click', download);
+$('back').addEventListener('click', () => {
+  if (adjQuad){ show('adjust'); drawEditor(); } else retake();
+});
+$('switch').addEventListener('click', async () => {
+  if (devices.length < 2) return;
+  deviceIdx = (deviceIdx + 1) % devices.length;
+  try { await start(devices[deviceIdx].deviceId); } catch(e){ fail(e); }
+});
+autoCropEl.addEventListener('change', () => { liveQuad = null; });
+document.addEventListener('keydown', e => {
+  if (e.code !== 'Space') return;
+  e.preventDefault();
+  if (mode === 'live' && !$('capture').disabled) capture();
+  else if (mode === 'adjust') doCrop();
+});
+
+function fail(err){
+  video.classList.add('hidden'); overlay.classList.add('hidden'); badge.classList.add('hidden');
+  msg.classList.remove('hidden');
+  msg.textContent = 'Could not access the camera: ' + (err && err.message ? err.message : err) +
+    '\n\nAllow camera access and reload. Browsers only grant camera access on https:// or localhost.';
+}
+
+show('live');
+start().then(() => { rafId = requestAnimationFrame(loop); }).catch(fail);
+})();
+</script>
+</body>
+</html>
